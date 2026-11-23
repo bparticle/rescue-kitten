@@ -239,8 +239,9 @@ try {
     fire(behind, 15, 829, 290, 1, ${tick})
     assert(behind.hits == 0, "targets behind the hero are safe")
 
+    -- A bare combat arena with the soldier where the old Soldier Drill placed it.
     local drill = Game.new(427, true)
-    local soldier = drill.enemies[1]
+    local soldier = drill:spawn_enemy("soldier", drill.x+96, drill.y+3, 7)
     local start_x = soldier.x
     advance(drill, 400)
     assert(soldier.x < start_x and soldier.pose > 1, "the soldier approaches with the shared walk cycle")
@@ -642,8 +643,8 @@ try {
 
   assert.equal(state().scene, 'briefing');
   await badge.press('back');
-  await badge.press('up');
-  await badge.press('select');
+  assert.equal(state().scene, 'missions');
+  await badge.press('right');
   await badge.frames(10);
   assert.equal(state().weapon, 0);
   assert.equal(state().found, 0);
@@ -837,16 +838,21 @@ try {
   assert.equal(state().scene, 'menu');
 
   const savedRange = state();
-  await badge.press('down');
+  // Field guide practice against the soldier covers incoming damage, retries and a win.
   await badge.press('down');
   await badge.press('select');
-  await advance(720);
-  assert.equal(state().mode, 'drill');
-  assert.equal(state().weapon, 1);
-  assert.equal(state().shots, 0, 'Select opens the drill without firing');
+  await badge.press('down');
+  await badge.press('right');
+  assert.equal(state().enemyPage, 1);
+  await badge.press('select');
+  await advance(240);
+  assert.equal(state().mode, 'practice');
+  assert.equal(state().practice, 'soldier');
+  assert.equal(state().weapon, 2);
+  assert.equal(state().shots, 0, 'Select opens practice without firing');
   assert.equal(state().health, 100, 'the first shot gives the player time to react');
   assert.equal(renderedHealth(), 35);
-  if (preview) badge.screenshot(path.join(preview, 'dust-range-soldier.png'));
+  if (preview) badge.screenshot(path.join(preview, 'dust-range-practice.png'));
   for (let tries = 0; tries < Math.ceil(1500 / tick) && state().health === 100; tries++) await badge.frames(1);
   assert.equal(state().health, 82);
   assert.equal(renderedHealth(), 29, 'player damage shortens the visible health bar');
@@ -868,19 +874,19 @@ try {
   const downed = state();
   await badge.hold('right', Math.ceil(320 / tick));
   assert.deepEqual(state(), downed, 'movement and combat stay frozen while down');
-  if (preview) badge.screenshot(path.join(preview, 'dust-range-drill-lost.png'));
+  if (preview) badge.screenshot(path.join(preview, 'dust-range-practice-lost.png'));
   await badge.press('select');
   await advance(220);
   assert.equal(state().result, 'active');
-  assert.equal(state().health, 100, 'Select restarts the drill at full health');
+  assert.equal(state().health, 100, 'Select restarts practice at full health');
   assert.equal(renderedHealth(), 35);
-  for (let shot = 0; shot < 3; shot++) {
+  for (let shot = 0; shot < 4 && state().result === 'active'; shot++) {
     await badge.press('select');
     await advance(240);
   }
   assert.equal(state().result, 'won');
-  assert.equal(state().hits, 3, 'three handgun hits defeat the soldier');
-  if (preview) badge.screenshot(path.join(preview, 'dust-range-drill-won.png'));
+  assert.equal(state().hits, 2, 'two rifle hits defeat the soldier');
+  if (preview) badge.screenshot(path.join(preview, 'dust-range-practice-won.png'));
   await badge.hold('back', Math.ceil(1240 / tick));
   assert.equal(state().scene, 'menu');
   await badge.press('down');
@@ -923,6 +929,7 @@ try {
   await badge.press('down');
   await badge.press('select');
   await badge.press('down');
+  await badge.press('left');
   assert.equal(state().enemyPage, 12);
   if (preview) badge.screenshot(path.join(preview, 'dust-range-enemy-guide.png'));
   await badge.press('select');
@@ -947,14 +954,14 @@ try {
   await badge.hold('back', Math.ceil(1240 / tick));
   assert.equal(state().scene, 'menu');
   await badge.press('up');
-  assert.equal(state().choice, 6, "EXIT GAME follows the ENDLESS RUN entry");
+  assert.equal(state().choice, 5, "EXIT GAME follows the ENDLESS RUN entry");
   await badge.press('select', { after: 0 });
   assert.equal(badge.exited, true, 'Exit Game returns to the launcher');
   assert.ok(badge.leds.every(dark));
 
   assert.ok(peak < 110_000, `callback budget regressed: ${peak}`);
   assert.ok(peakObjects === 3, `expected two playfield canvases and one menu, saw ${peakObjects} objects`);
-  console.log(`Passed at ${tick} ms per tick. Checked the arsenal, controls, LEDs, menus, duel, Endless Run and enemy spacing.`);
+  console.log(`Passed at ${tick} ms per tick. Checked the arsenal, controls, LEDs, menus, practice, Endless Run and enemy spacing.`);
   console.log(`Headless peaks: ${Math.ceil(peak)} / 200000 instructions, ${Math.ceil(peakHeap)} KiB sampled Lua heap, ${peakObjects} UI objects.`);
 } finally {
   badge.close();

@@ -8,12 +8,12 @@ Open the [Solana OS app loader](https://solana.com/breakpoint/badge/apps/submit)
 
 Use Solana OS 2.0 or newer for the 6 MiB Lua heap. The app uses the LED permission. Solana OS 2.3 and later support its 16 ms tick request.
 
-Dustpaw opens on the **Rescue Kitten** title card. Press **Select** to start, walk up to the kitten to pick it up, then carry it to the exit. After a successful rescue, **Select** opens **Missions** so you can continue to **Outpost**. For free practice, press **Cancel** on the title card and choose **Testing Range**. The range is also available from the mission pause menu.
+Dustpaw has two modes: **Missions**, the main game, and the **Testing Range**. It opens on the title card for the first mission. Press **Select** to start, walk up to the kitten to pick it up, then carry it to the exit. After a successful rescue, **Select** opens **Missions** with the next one selected. Press **Cancel** on the title card to open the missions list, and press **Right** there to open the Testing Range. The range is also available from the mission pause menu, and the range pause menu leads back to Missions.
 
 - **D-pad** moves the hero and sets the firing direction. Walk over a floating weapon to pick it up and equip it. When the nearest available pickup is at the edge of the screen or beyond it, the marker is amber for weapons and a green cross for medkits.
 - **Select** fires, throws, swings, or places the equipped item. Hold it for the rifle, flamethrower and cryo sprayer. Hold and release it to fire the charge cannon. The range has unlimited ammunition.
 - Tap **Cancel** to cycle through collected weapons and the unarmed stance. Hold **Cancel** for 1.2 seconds to pause at the menu.
-- In the menu, use **Up/Down** and **Select** to resume, open **Weapon Specs**, start a combat drill, or exit. Use **Left/Right** on the pause menu to toggle pickup bobbing. In Weapon Specs, **Left/Right** browse weapons and **Select** goes to the next page. **Cancel** goes back one screen. **Home** returns directly to the launcher.
+- In the menu, use **Up/Down** and **Select** to resume, open **Weapon Specs**, open **Missions**, start **Endless Run**, or exit. Use **Left/Right** on the pause menu to toggle pickup bobbing. In Weapon Specs, **Left/Right** browse weapons and **Select** goes to the next page. **Cancel** goes back one screen. **Home** returns directly to the launcher.
 - In **Weapon Specs**, press **Down** for the Enemy Field Guide. Browse enemy profiles with **Left/Right** and press **Select** to practice against that enemy. **Up** returns to Weapon Specs. The medic practice includes an injured ally so you can try interrupting the heal.
 
 The pickup message points toward that weapon's test target. The direction follows the D-pad, so tap toward the target before firing. You can shoot any target with any weapon.
@@ -22,16 +22,33 @@ Each target has a health bar. The HUD shows the damage type, damage dealt, and r
 
 The six top LEDs show the equipped weapon's family: 1 pistols (handgun, bankshot), 2 rifles (assault rifle, rail rifle), 3 close range (shotgun, shock hammer), 4 throwables (grenade, TNT, boomerang disc), 5 heavy (rocket launcher, charge cannon, gravity orb) and 6 projectors (flamethrower, arc projector, cryo sprayer). A newly collected slot flares gold, the weapon in hand glows amber, and a confirmed hit sends a red pulse from the center to the edges.
 
-Your health is shown at the right of the HUD in every mode. Each combat drill starts at 100 HP. When wounded, you also get a small bar above your character. The playfield border and two side LEDs flash on damage, and the HUD warns at 25 HP or below. The weapon-testing range is safe for testing your gear.
+Your health is shown at the right of the HUD in every mode. Endless Run and enemy practice start at 100 HP; each mission sets its own starting health. When wounded, you also get a small bar above your character. The playfield border and two side LEDs flash on damage, and the HUD warns at 25 HP or below. The weapon-testing range is safe for testing your gear.
 
 Walk over a medkit in a mission to restore up to 30 HP. A medkit stays available until you pick it up while wounded.
 
-## Combat drills
+## Missions
 
-- **Soldier Drill** is a one-on-one handgun duel. The soldier stops and shows a gold marker before each shot. Move away from the spot where it first took aim.
+Ten kitten rescues, from a backyard with one guard to a three-wave assault on a fortress. Each mission adds weapons, enemy types and new ways to hide the kitten:
+
+| # | Mission | New in this mission |
+| --- | --- | --- |
+| 1 | Backyard | One soldier, the kitten in plain sight |
+| 2 | Orchard | Assault rifle pickup, a runner, the kitten behind a hedge |
+| 3 | Farmhouse | Shotgun in the coop, a rifleman, the kitten under a roof |
+| 4 | Crate Yard | Grenades, scatterguards, a lobber, barrels, the kitten boxed in by crates |
+| 5 | Riverside | Rail rifle, wardens on the bridge, a marksman, a second wave, the kitten on an island |
+| 6 | Hedge Maze | Boomerang disc and arc projector, skirmishers, a medic, the kitten at the centre |
+| 7 | Burning Barn | Cryo sprayer and flamethrower, cinders, a bruiser, fire pits |
+| 8 | Cold Storage | TNT, rocket launcher, charge cannon, cryo techs, a rooftop marksman, the kitten in a sealed vault |
+| 9 | Outpost | Every material in the tileset, the kitten in the barn across the river |
+| 10 | Fortress | Gravity orb and shock hammer, all enemy types, three waves, rooftop marksmen |
+
+## Testing Range modes
+
 - **Endless Run** is a wave survival mode, available from the range menu. You start with the handgun, assault rifle, pump shotgun, rail rifle and arc projector. Tap **Cancel** to switch between them. Later waves can contain up to 14 enemies, with at most eight active at once. Gold ground markers show where reinforcements will arrive.
 - Runners circle at a distance and rush in one at a time, then mark the ground before striking. Riflemen fire bursts, and scatterguards hold just inside their short spread. Lobbers mark a grenade's landing zone. Wardens lower their frontal shield while aiming, and skirmishers strafe between shots. Hit a medic during its green cue to interrupt a heal. Sidestep a bruiser's marked charge or interrupt it with the arc projector. Bruisers back off after each charge. A red edge marker points to an enemy beyond the screen.
 - Between waves you recover up to 24 HP and clear burn and frost effects. The HUD shows BURNING or CHILLED while those effects are active.
+- In **Weapon Specs**, the Enemy Field Guide starts a practice fight against any enemy.
 - At 0 HP, combat stops. After a win or loss, press **Select** to retry at full health. Hold **Cancel** to pause, then choose **Back to Range** to resume the original weapon-testing session.
 - Endless Run rotates its barricade layout every three waves. Barricades block movement and direct shots. Enemies route around them, and lobbers can aim over them. Late marksmen show a pink lane before they fire.
 - Cinders can leave the player burning. Cryo techs slow movement until their frost wears off or a follow-up hit shatters it. Each can drop its weapon once per run.
@@ -89,7 +106,7 @@ Each of the 15 weapons has a hero walk sheet (`sprites/hero/walk-<weapon>.png`) 
 
 - `python tools/build_assets.py` regenerates the packaged Lua artwork after PNG edits, including one `art/fx-<weapon>.lua` module per effect set. It requires Pillow.
 - `python tools/draw_new_weapon_art.py` drew the first pass of the starter-arsenal hero sheets and effect sheets. It overwrites those PNGs, so run it only to start over. Edit the PNGs directly after that.
-- `node tools/smoke.mjs` checks the range, combat drills, input, and LEDs with the sibling `mosa-badge` headless host at 16 ms per tick. It reports callback instructions, sampled Lua heap, and UI objects.
+- `node tools/smoke.mjs` checks the range, Endless Run, enemy practice, input, and LEDs with the sibling `mosa-badge` headless host at 16 ms per tick. It reports callback instructions, sampled Lua heap, and UI objects.
 - `node tools/bench.mjs` measures combat, startup and repeat retries. It estimates sideload file-read costs and compares the packed-run fallback with a model of the native RGB565 tile renderer. On the badge or official emulator, `lua mem` in the console reports the previous run's actual peaks after closing the app.
 - Both tools accept `DUST_RANGE_TICK_MS=30` for the original cadence, `DUST_RANGE_APP_DIR` for an extracted release, and `MOSA_BADGE_DIR` for a different headless host checkout.
 

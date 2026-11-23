@@ -7,15 +7,15 @@ local icons = require("art.icons")
 local Menu = {}
 Menu.__index = Menu
 local range_options = {
-  {"resume", "RESUME RANGE"}, {"specs", "WEAPON SPECS"},
-  {"drill", "SOLDIER DRILL"}, {"endless", "ENDLESS RUN"}, {"exit", "EXIT GAME"},
+  {"resume", "RESUME RANGE"}, {"specs", "WEAPON SPECS"}, {"endless", "ENDLESS RUN"}, {"exit", "EXIT GAME"},
 }
-local level_options = {}
-for index, option in ipairs(range_options) do level_options[index] = option end
--- After SOLDIER DRILL, so every other entry keeps its place counted from the top or bottom.
-table.insert(level_options, 4, {"missions", "MISSIONS"})
+local level_options = {
+  {"resume", "RESUME RANGE"}, {"specs", "WEAPON SPECS"}, {"missions", "MISSIONS"},
+  {"endless", "ENDLESS RUN"}, {"exit", "EXIT GAME"},
+}
+-- Endless Run and enemy practice from the field guide.
 local drill_options = {
-  {"resume", "RESUME DRILL"}, {"drill", "RETRY DRILL"},
+  {"resume", "RESUME"}, {"drill", "RETRY"},
   {"range", "BACK TO RANGE"}, {"exit", "EXIT GAME"},
 }
 local mission_options = {
@@ -71,6 +71,20 @@ end
 
 function Menu:close()
   self.canvas:show(false)
+end
+
+-- Split a briefing into lines of at most width characters at spaces.
+local function wrap(value, width)
+  local lines, line = {}, ""
+  for word in value:gmatch("%S+") do
+    if line ~= "" and #line + 1 + #word > width then
+      lines[#lines+1], line = line, word
+    else
+      line = line == "" and word or line .. " " .. word
+    end
+  end
+  if line ~= "" then lines[#lines+1] = line end
+  return lines
 end
 
 local menu_rows = {[4]={32,26}, [5]={25,21}, [6]={22,18}, [7]={18,16}}
@@ -278,23 +292,29 @@ local objectives = {
   ["rescue-kitten"]={"RESCUE KITTEN", "WALK UP TO THE KITTEN", "CARRY IT TO THE EXIT"},
 }
 
-function Menu:draw_briefing(level, index)
+-- Returns true when the screen needs another call with rest = true to finish drawing.
+function Menu:draw_briefing(level, index, rest)
   local c = self.canvas
   local goal = objectives[level.objective] or objectives.clear
   local rescue = level.objective == "rescue-kitten"
-  frame(c,"SELECT START", "CANCEL MISSIONS")
-  if rescue and level.id == "rescue-kitten" then
+  if rescue and index == 1 then
     local title = require("art.rescue-title")
+    -- Each half of the title art is about 2,000 rects, so the halves draw on consecutive ticks.
+    if rest then
+      stamp(c,title.right,160,0,2,title.colors)
+      return false
+    end
+    frame(c,"SELECT START", "CANCEL MISSIONS")
     c:rect(0,0,320,176,title.background)
     stamp(c,title.left,0,0,2,title.colors)
-    stamp(c,title.right,160,0,2,title.colors)
     c:rect(0,176,320,21,INK)
     c:rect(0,176,320,1,BORDER)
     text(c,goal[1],14,180,BRASS,2)
     text(c,goal[2],181,179,TEXT)
     text(c,goal[3],181,188,TEXT)
-    return
+    return true
   end
+  frame(c,"SELECT START", "CANCEL MISSIONS")
 
   text(c,"DUSTPAW",18,18,DIM)
   right(c,string.format("MISSION %02d",index),302,18,BRASS)
@@ -305,9 +325,15 @@ function Menu:draw_briefing(level, index)
   text(c,title,18,52,BRASS,scale)
   c:rect(18,89,284,91,PANEL)
   c:rect(18,89,3,91,rescue and 0xb4cc92 or BRASS)
-  text(c,"OBJECTIVE",32,110,DIM)
-  text(c,goal[2],32,130,TEXT)
-  if goal[3] then text(c,goal[3],32,146,TEXT) end
+  text(c,"OBJECTIVE",32,100,DIM)
+  text(c,goal[2],32,114,TEXT)
+  if goal[3] then text(c,goal[3],32,126,TEXT) end
+  if level.brief then
+    for line_index, line in ipairs(wrap(level.brief, rescue and 27 or 44)) do
+      if line_index > 2 then break end
+      text(c,line,32,136+line_index*12,BRASS)
+    end
+  end
   if rescue then
     local kitten = require("art.kitten")
     c:rect(201,97,92,75,0x444738)
@@ -319,34 +345,27 @@ function Menu:draw_briefing(level, index)
   end
 end
 
--- Exported levels are listed in mission order, followed by the testing range.
+-- Exported levels in mission order. The testing range is its own mode, opened with Right.
 function Menu:draw_missions(choice, levels)
   local c = self.canvas
-  frame(c,"UP/DOWN CHOOSE  SELECT OPEN","CANCEL BACK")
+  frame(c,"SELECT OPEN  RIGHT TESTING RANGE","CANCEL BACK")
   text(c,"MISSIONS",14,19,BRASS,3)
   c:rect(14,53,292,1,BORDER)
   local visible = 7
-  local first = math.max(1, math.min(choice-3, #levels-visible+2))
+  local first = math.max(1, math.min(choice-3, #levels-visible+1))
   for row = 0, visible-1 do
     local index = first + row
     local level = levels[index]
-    if index > #levels + 1 then break end
+    if not level then break end
     local y = 62 + row*19
     local selected = index == choice
     c:rect(14,y,174,16,selected and BRASS or PANEL)
     c:rect(14,y,3,16,selected and 0xb5744e or BORDER)
-    text(c,level and level.name:upper():sub(1,26) or "TESTING RANGE",24,y+5,selected and INK or TEXT)
+    text(c,string.format("%02d ",index) .. level.name:upper():sub(1,22),24,y+5,selected and INK or TEXT)
   end
   local level = levels[choice]
   c:rect(198,62,108,128,BORDER)
   c:rect(199,63,106,126,PANEL)
-  if not level then
-    text(c,"FREE PRACTICE",205,70,BRASS)
-    text(c,"WEAPON SPECS",205,95,TEXT)
-    text(c,"SOLDIER DRILL",205,111,TEXT)
-    text(c,"ENDLESS RUN",205,127,TEXT)
-    return
-  end
   local rows = {
     {"GOAL", (objectives[level.objective] or objectives.clear)[1]},
     {"SIZE", (level.w or 0) .. "X" .. (level.h or 0)},

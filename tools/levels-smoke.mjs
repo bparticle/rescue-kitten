@@ -5,7 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { installHeadlessClock } from './headless-clock.mjs';
-import { cellValue, materialMap, newLevel, tileKeysAt, toLua, validate, variantAt } from './level-builder/format.mjs';
+import { cellFlags, cellOf, cellValue, materialMap, newLevel, tileKeysAt, toLua, validate, variantAt } from './level-builder/format.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const mosa = process.env.MOSA_BADGE_DIR ?? path.resolve(root, '..', 'mosa-badge');
@@ -102,6 +102,37 @@ assert.match(toLua(rescueFixture, materials), /\{"kitten",88,24\}/);
 assert.ok(validate({ ...rescueFixture, entities: [...rescueFixture.entities, { type: 'kitten', x: 24, y: 24 }] }, materials)
   .some((issue) => issue.severity === 'error' && issue.message === 'Only one kitten is allowed.'));
 console.log('ok  builder validates and exports the kitten rescue objective');
+
+// The campaign: every bundled mission validates, is a kitten rescue, and lets the player reach the
+// kitten and then the exit on foot, breaking destructible tiles where a level seals the kitten in.
+const campaign = [...fs.readFileSync(path.join(app, 'levels', 'index.lua'), 'utf8').matchAll(/id="([^"]+)"/g)].map((m) => m[1]);
+assert.equal(campaign.length, 10, 'ten missions');
+assert.equal(campaign[0], 'backyard');
+let previousArea = 0;
+for (const id of campaign) {
+  const level = JSON.parse(fs.readFileSync(path.join(root, 'levels', `${id}.json`), 'utf8'));
+  assert.deepEqual(validate(level, materials).filter((issue) => issue.severity === 'error'), [], id);
+  assert.equal(level.objective, 'rescue-kitten', id);
+  assert.ok(level.width * level.height >= previousArea, `${id} is at least as large as the mission before it`);
+  previousArea = level.width * level.height;
+  const passable = level.structure.map((_, i) => { const f = cellFlags(level, i, materials); return !f.walk || f.hp > 0; });
+  const flood = (start) => {
+    const seen = new Set([start]);
+    for (const queue = [start]; queue.length;) {
+      const i = queue.pop(), x = i % level.width, y = Math.floor(i / level.width);
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy, j = ny * level.width + nx;
+        if (nx < 0 || ny < 0 || nx >= level.width || ny >= level.height || seen.has(j) || !passable[j]) continue;
+        seen.add(j); queue.push(j);
+      }
+    }
+    return seen;
+  };
+  const find = (type) => level.entities.find((e) => e.type === type);
+  const from = flood(cellOf(level, find('spawn').x, find('spawn').y));
+  for (const type of ['kitten', 'exit']) assert.ok(from.has(cellOf(level, find(type).x, find(type).y)), `${id}: ${type} unreachable`);
+}
+console.log(`ok  ${campaign.length} missions validate and their kittens and exits can be reached`);
 
 const badge = new SolanaOS({ dir: app });
 const readApp = badge.options.read;
@@ -262,16 +293,16 @@ check('view draws both exposed and hidden rooftop enemies and elevated fire', `l
   v:draw(g)
   return "ok"`, 'ok');
 
-check('level loads at spawn', `local g = fresh(); return string.format("%d,%d,%d,%d,%d", g.x, g.y, g.width, g.height, g.health)`, '24,264,768,512,120');
+check('level loads at spawn', `local g = fresh(); return string.format("%d,%d,%d,%d,%d", g.x, g.y, g.width, g.height, g.health)`, '24,264,768,512,130');
 check('Outpost medkit stays at full health, caps healing, and is consumed once', `local g = fresh()
   local kit
   for _, item in ipairs(g.pickups) do if item.kind == "medkit" then kit = item; break end end
   g.x, g.y = kit.x-5, kit.y
   run(g, 16, {right=true})
-  assert(g.health == 120 and g:pickup_visible(kit))
-  g.health = 115
+  assert(g.health == 130 and g:pickup_visible(kit))
+  g.health = 125
   run(g, 16, {right=true})
-  assert(g.health == 120 and not g:pickup_visible(kit) and g.notice == "MEDKIT  +5 HP")
+  assert(g.health == 130 and not g:pickup_visible(kit) and g.notice == "MEDKIT  +5 HP")
   g.health = 90
   run(g, 16, {right=true})
   return g.health .. " " .. g.weapon .. " " .. g.found`, '90 1 0');
@@ -382,6 +413,7 @@ check('spotting the player wakes the guard', `local g = fresh()
   run(g, 100)
   return tostring(g.enemies[1].dormant == nil)`, 'true');
 check('clearing waves opens the exit', `local g = fresh()
+  g.mission.objective, g.mission.kitten = "clear-exit", nil
   for _, e in ipairs(g.enemies) do e.health = 0 end
   run(g, 100)
   local wave = g.squad.wave
@@ -408,18 +440,17 @@ if (shots) badge.screenshot(path.join(shots, 'mission-briefing.png'));
 await badge.hold('select', 36);
 assert.equal(status()[9], 'range');
 assert.equal(status()[12], 'level');
-assert.deepEqual(position(), [40, 120]);
+assert.deepEqual(position(), [40, 72]);
 assert.equal(status()[5], '0', 'Select starts the mission without firing');
-await walk('down', 168);
+await walk('left', 24);
+await walk('down', 120);
 assert.equal(status()[14], 'active', 'the exit stays locked until the kitten is found');
-await walk('up', 136);
-await walk('right', 248);
 await walk('up', 72);
+await walk('right', 152);
 if (shots) badge.screenshot(path.join(shots, 'mission-kitten.png'));
-await walk('right', 258);
-await walk('left', 248);
-await walk('down', 136);
-await walk('left', 40);
+if (shots) { await badge.frames(31); badge.screenshot(path.join(shots, 'mission-kitten-bob.png')); }
+await walk('down', 88);
+await walk('left', 24);
 await badge.hold('down', 24);
 assert.equal(status()[14], 'won', 'carrying the kitten to the exit completes the mission');
 if (shots) badge.screenshot(path.join(shots, 'mission-rescued.png'));
@@ -430,9 +461,39 @@ await badge.press('select');
 assert.equal(status()[9], 'briefing');
 await badge.press('select');
 await badge.frames(40);
-assert.deepEqual(position(), [24, 264]);
+assert.deepEqual(position(), [40, 120], 'the next mission is Orchard');
+console.log('ok  game opens on Backyard, requires extraction, then offers Orchard');
+
+// The missions list holds only missions; Right opens the testing range on its own.
+await badge.hold('back', Math.ceil(1240 / 16));
+assert.equal(status()[9], 'menu');
+await badge.press('down');
+await badge.press('down');
+await badge.press('select');
+assert.equal(status()[9], 'missions');
+await badge.press('up');
+await badge.press('up');
+await badge.press('down');
+await badge.press('down');
+await badge.press('down');
+assert.equal(status()[9], 'missions');
+await badge.press('right');
+assert.equal(status()[9], 'range');
+assert.equal(status()[12], 'range', 'Right on the missions list opens the testing range');
+await badge.frames(30);
+await badge.hold('back', Math.ceil(1240 / 16));
+await badge.press('down');
+await badge.press('down');
+await badge.press('select');
+assert.equal(status()[9], 'missions');
+for (let i = 0; i < 8; i++) await badge.press("down");
+await badge.press('select');
+assert.equal(status()[9], 'briefing');
+if (shots) badge.screenshot(path.join(shots, 'outpost-briefing.png'));
+await badge.press('select');
+await badge.frames(40);
+assert.deepEqual(position(), [24, 264], 'mission 9 is Outpost');
 if (shots) badge.screenshot(path.join(shots, 'level-start.png'));
-console.log('ok  game opens on Rescue Kitten, requires extraction, then offers Outpost');
 // Walk into the crossroads firefight and keep shooting.
 for (let i = 0; i < 12; i++) { await badge.hold('right', 25); await badge.press('select'); }
 for (let i = 0; i < 6; i++) { await badge.hold('up', 15); await badge.press('select'); }

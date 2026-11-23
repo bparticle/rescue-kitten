@@ -929,6 +929,10 @@ function buildUi() {
   field('lvl-name', (v) => { state.level.name = v.trim() || 'Untitled'; });
   field('lvl-id', (v) => { state.level.id = v.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-'); $('lvl-id').value = state.level.id; });
   field('lvl-objective', (v) => { state.level.objective = v; });
+  field('lvl-brief', (v) => {
+    const brief = v.trim().replace(/\s+/g, ' ');
+    if (brief) state.level.brief = brief; else delete state.level.brief;
+  });
   field('lvl-health', (v) => {
     state.level.health = Math.max(10, Math.min(999, Math.round(Number(v)) || 100));
     $('lvl-health').value = state.level.health;
@@ -1004,6 +1008,7 @@ function syncLevelForm() {
   $('lvl-name').value = l.name || '';
   $('lvl-id').value = l.id;
   $('lvl-objective').value = l.objective || 'clear';
+  $('lvl-brief').value = l.brief || '';
   $('lvl-health').value = l.health || 100;
   $('lvl-order').value = l.order || 0;
   $('lvl-w').value = l.width;

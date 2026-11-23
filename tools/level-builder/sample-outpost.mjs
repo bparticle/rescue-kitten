@@ -10,7 +10,10 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const materials = materialMap(JSON.parse(fs.readFileSync(path.join(root, 'sprites', 'tiles', 'materials.json'), 'utf8')));
 const W = 48, H = 32;
 const level = newLevel('outpost', W, H, 911);
-Object.assign(level, { name: 'Outpost', objective: 'clear-exit', health: 120, loadout: [1], order: 1 });
+Object.assign(level, {
+  name: 'Outpost', objective: 'rescue-kitten', health: 130, loadout: [1, 2], order: 9,
+  brief: 'THE KITTEN CRAWLED INTO THE BARN ACROSS THE RIVER.',
+});
 
 let seed = 7;
 const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
@@ -119,6 +122,7 @@ const pickup = (weapon, x, y) => { const [px, py] = c(x, y); level.entities.push
 level.entities = [];
 { const [x, y] = c(1, 16); level.entities.push({ type: 'spawn', x, y, dir: 2 }); }
 { const [x, y] = c(46, 15); level.entities.push({ type: 'exit', x, y }); }
+{ const [x, y] = c(42, 8); level.entities.push({ type: 'kitten', x, y }); }
 enemy('soldier', 9, 8, 4); enemy('rifleman', 11, 6, 6);
 enemy('lobber', 24, 10, 4); enemy('soldier', 24, 20, 0);
 enemy('warden', 18, 23, 0); enemy('scatterguard', 20, 22, 6);

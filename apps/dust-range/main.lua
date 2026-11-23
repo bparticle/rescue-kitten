@@ -63,7 +63,7 @@ if has_levels then show_briefing(1) end
 
 local function retry()
   if game.mission then show_briefing(active_mission)
-  else start_game(game.drill or true, game.practice) end
+  else start_game(game.drill, game.practice) end
 end
 
 local function navigate(key, repeated)
@@ -87,11 +87,12 @@ local function navigate(key, repeated)
     end
   elseif scene == "missions" then
     if key == "up" or key == "down" then
-      level_choice = (level_choice - 1 + (key == "up" and -1 or 1)) % (#levels + 1) + 1
+      level_choice = (level_choice - 1 + (key == "up" and -1 or 1)) % #levels + 1
       menu_dirty = true
     elseif key == "select" and not repeated then
-      if levels[level_choice] then show_briefing(level_choice)
-      else open_range() end
+      show_briefing(level_choice)
+    elseif key == "right" and not repeated then
+      open_range()
     end
   elseif scene == "menu" then
     local options = Menu.options(game.drill, has_levels)
@@ -172,8 +173,9 @@ function on_tick(ms)
   end
   if scene ~= "range" then
     if menu_dirty then
+      local unfinished = false
       if scene == "briefing" then
-        menu:draw_briefing(levels[briefing_choice], briefing_choice)
+        unfinished = menu:draw_briefing(levels[briefing_choice], briefing_choice, menu_dirty == "rest")
         if indicators then indicators:clear() end
       elseif scene == "missions" then
         menu:draw_missions(level_choice, levels)
@@ -192,7 +194,7 @@ function on_tick(ms)
         menu:draw_pause(choice, game, screen:weapon_art(game:held_weapon())[game.direction][1], has_levels, screen.pickup_motion)
         if indicators then indicators:clear() end
       end
-      menu_dirty = false
+      menu_dirty = unfinished and "rest" or false
     end
     return
   end

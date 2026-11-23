@@ -8,7 +8,7 @@ Dustpaw levels are tile maps built with the local level builder and exported as 
 node tools/level-builder/server.mjs
 ```
 
-Open http://localhost:5178. Saved levels go to `levels/<id>.json`. **Export to badge** writes `apps/dust-range/levels/<id>.lua` and rebuilds `levels/index.lua`, which adds the level to **Missions**. The first mission in menu order opens at launch. **Build ZIP** runs `tools/package.py`.
+Open http://localhost:5178. Saved levels go to `levels/<id>.json`. **Export to badge** writes `apps/dust-range/levels/<id>.lua` and rebuilds `levels/index.lua`, which adds the level to **Missions**. Set **Menu order** to place it. The first mission in menu order opens at launch on the title card. **Briefing** is an optional line shown on the mission's briefing screen. It wraps to two lines of 27 characters, and the badge font has letters, digits and `/ . % < > + -`. **Build ZIP** runs `tools/package.py`.
 
 | Key | Tool |
 | --- | --- |
@@ -23,10 +23,11 @@ Open http://localhost:5178. Saved levels go to `levels/<id>.json`. **Export to b
 
 Other tools:
 
-- `node tools/levels-smoke.mjs` checks rooftop combat, tile interactions, Outpost, the level menu and the badge's per-tick budget in the headless host.
+- `node tools/levels-smoke.mjs` checks rooftop combat, tile interactions, Outpost, every bundled mission (valid, a kitten rescue, kitten and exit reachable), the level menu and the badge's per-tick budget in the headless host.
+- `node tools/level-builder/campaign.mjs` drafted the ten missions. It skips levels that already exist in `levels/`, so builder edits are safe. `--force` redrafts and overwrites them, and you can name level ids to redraft only those.
 - `node tools/level-builder/export.mjs` re-exports every level in `levels/` without the editor, for example after changing tile properties.
 - `python tools/draw_tiles.py` redraws `sprites/tiles/tileset.png`. `python tools/build_assets.py` packs it with the properties into `art/tiles.lua`.
-- `node tools/level-builder/sample-outpost.mjs` rebuilds `levels/outpost.json`. Outpost uses all 45 materials: bridge decking, a gravel path with planters, a sandy bank, cracked asphalt, a metal checkpoint, both barbed wire directions, debris, and ridges, vents and a skylight on the roofs.
+- `node tools/level-builder/sample-outpost.mjs` rebuilds `levels/outpost.json` (mission 9) and overwrites builder edits to it. Outpost uses all 45 materials: bridge decking, a gravel path with planters, a sandy bank, cracked asphalt, a metal checkpoint, both barbed wire directions, debris, and ridges, vents and a skylight on the roofs.
 
 ## Painting connected tiles
 
@@ -37,7 +38,9 @@ Other tools:
 
 ## Kitten rescue missions
 
-Set **Objective** to **Rescue kitten and carry it to the exit**. Place one **Kitten** and one **Exit** with the Entities tool, then export the level. The player picks up the kitten by walking up to it and completes the mission at the exit. Enemy waves are optional. Open `rescue-kitten` in the editor to see the bundled mission.
+Set **Objective** to **Rescue kitten and carry it to the exit**. Place one **Kitten** and one **Exit** with the Entities tool, then export the level. The player picks up the kitten by walking up to it and completes the mission at the exit. Enemy waves are optional. All ten bundled missions are rescues: open `backyard` for the simplest one.
+
+The builder warns when the kitten **cannot be reached on foot**. Crate Yard and Cold Storage do this on purpose: crates and brick walls seal the kitten in, and the player breaks through. `levels-smoke.mjs` checks that destructible tiles open a way through in every bundled mission.
 
 ## Rooftop enemies
 
@@ -104,7 +107,7 @@ Every tile's behaviour comes from `sprites/tiles/materials.json`. The game, the 
 ## Limits
 
 - Levels are 10 × 7 to 96 × 96 tiles. A 96 × 96 level with 24 enemies peaked at 132,000 of 200,000 instructions per tick and about 3 MB of Lua heap in the headless host.
-- Each exported level is one bundled file. With Outpost the app uses 47 of 64 files and 902 KB of the 1 MiB package. Outpost exports to 10 KB, so about 14 levels of that size fit.
+- Each exported level is one bundled file. With the ten missions the app uses 58 of 64 files and 972 KB of the 1 MiB package, so about five more missions of Outpost's size (10 KB) fit.
 - `art/tiles.lua` is 212 KB of the 256 KiB per-file limit. Each new area material (47 outlines) adds 14 to 20 KB, so only two or three more fit unless their art is simplified.
 - Tiles keep their own palette of up to 91 colours, separate from the sprite palette. The atlas uses 89.
 - Actors use a 6 px body against tiles, so every enemy fits through a one-tile doorway.

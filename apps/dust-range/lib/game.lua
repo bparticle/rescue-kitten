@@ -113,7 +113,7 @@ function Game.new(seed, drill, surveyed_ground, practice)
         local patient = game:spawn_enemy("soldier", x+61, y-16, 7)
         patient.health, patient.ready_at = 30, 0.9
       end
-    else game:spawn_enemy("soldier", x+96, y+3, 7) end
+    end
   end
   return game
 end
@@ -138,7 +138,7 @@ function Game:prepare()
 end
 
 function Game:cycle()
-  if self.result or (self.drill and not self.squad and not self.practice) then return end
+  if self.result then return end
   for shift = 1, #Game.weapons + 1 do
     local id = (self.weapon + shift) % (#Game.weapons + 1)
     if self.owned[id] then

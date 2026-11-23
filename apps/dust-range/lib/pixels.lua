@@ -15,8 +15,13 @@ local glyphs = {
   ["/"]="2010080402", ["-"]="0808080808", ["."]="0060600000", ["%"]="2313086462",
   ["<"]="0814224100", [">"]="0041221408", ["+"]="08083e0808",
 }
-local letters = {}
-for char, code in pairs(glyphs) do
+-- Glyphs decode on first use, so boot doesn't pay for letters a screen never shows.
+local letters = setmetatable({}, {__index=function(letters, char)
+  local code = glyphs[char]
+  if not code then
+    letters[char] = false
+    return false
+  end
   local pixels = {}
   for x = 0, 4 do
     local mask = tonumber(code:sub(x*2+1,x*2+2),16)
@@ -25,7 +30,8 @@ for char, code in pairs(glyphs) do
     end
   end
   letters[char] = pixels
-end
+  return pixels
+end})
 
 function Pixels.stamp(c, data, x, y, scale, colors)
   scale = scale or 1

@@ -270,16 +270,45 @@ local function draw_exit(c, exit, left, top, time, open)
   text(c,"EXIT",x-11,y-3,color)
 end
 
-local function draw_kitten(c, x, y, carried)
+-- The kitten's head (rows 0-8) bobs a pixel over its body (rows 8-12). Row 8 sits
+-- in both halves, so lifting the head stretches the neck instead of opening a gap.
+local NECK = 8
+local kitten_parts
+local function kitten_halves()
+  if kitten_parts then return kitten_parts end
+  local art, head, body = require("art.kitten").art, {}, {}
+  for i = 1, #art, 5 do
+    local x, y, w, h, color = string.byte(art, i, i + 4)
+    local top, bottom = y - 35, y - 35 + h - 35
+    if top <= NECK then
+      head[#head+1] = string.char(x, y, w, math.min(bottom, NECK+1) - top + 35, color)
+    end
+    if bottom > NECK then
+      local from = math.max(top, NECK)
+      body[#body+1] = string.char(x, from + 35, w, bottom - from + 35, color)
+    end
+  end
+  kitten_parts = {table.concat(head), table.concat(body)}
+  return kitten_parts
+end
+
+local function kitten_step(time)
+  return floor(time*2) % 2
+end
+
+local function draw_kitten(c, x, y, carried, bob)
   local kitten = require("art.kitten")
-  if x < -kitten.w or x >= FIELD_W+kitten.w or y < -kitten.h or y >= FIELD_H+kitten.h then return end
+  if x < -kitten.w or x >= FIELD_W+kitten.w or y < -kitten.h or y >= FIELD_H+kitten.h then return false end
   if not carried then
     c:rect(x-5,y+3,11,2,SHADOW)
     c:rect(x-6,y+4,13,1,SHADOW)
     c:rect(x-9,y+1,2,1,HP_GREEN)
     c:rect(x+8,y+1,2,1,HP_GREEN)
   end
-  stamp(c,kitten.art,x-kitten.w//2,y-8,1,kitten.colors)
+  local halves, left = kitten_halves(), x-kitten.w//2
+  stamp(c,halves[2],left,y-8,1,kitten.colors)
+  stamp(c,halves[1],left,y-8-(bob or 0),1,kitten.colors)
+  return true
 end
 
 local function pickup_step(time)
@@ -287,8 +316,9 @@ local function pickup_step(time)
 end
 
 function View:needs_pickup_frame(game)
-  return self.pickup_motion and not game.result and self.pickups_on_screen
-    and self.pickup_step ~= pickup_step(game.time)
+  if not self.pickup_motion or game.result then return false end
+  return self.pickups_on_screen and self.pickup_step ~= pickup_step(game.time)
+    or self.kitten_on_screen and self.kitten_step ~= kitten_step(game.time)
 end
 
 local function draw_medkit(c, x, y)
@@ -825,7 +855,7 @@ local function hud(c, game)
   text(c,game.health .. "/" .. game.surface.health .. " HP",253,4,color)
   if game.drill then
     local squad = game.squad
-    local status = game.practice and "PRACTICE" or "SOLDIER DRILL"
+    local status = "PRACTICE"
     if game.mission and game.mission.objective == "rescue-kitten" then
       status = game.result == "won" and "KITTEN SAFE" or game.mission.carrying and "REACH THE EXIT" or "FIND THE KITTEN"
     elseif game.mission and squad.total == 1 then status = string.format("%d LEFT", squad.remaining)
@@ -838,8 +868,7 @@ local function hud(c, game)
     elseif game.burn then condition, condition_color = "BURNING", HP_AMBER
     elseif game.frost_speed then condition, condition_color = "CHILLED", 0xa4cad8
     elseif ratio > 0 and ratio <= 0.25 and not game.result then condition, condition_color = "LOW HP", HP_RED end
-    local hint = (squad or game.practice) and "D-PAD MOVE  SELECT FIRE  CANCEL GEAR / HOLD MENU"
-      or "D-PAD MOVE  SELECT FIRE  HOLD CANCEL MENU"
+    local hint = "D-PAD MOVE  SELECT FIRE  CANCEL GEAR / HOLD MENU"
     local notice = game.notice or hint
     if condition then
       local x = W-6*#condition-7
@@ -902,8 +931,11 @@ function View:draw(game)
   if game.exit then
     draw_exit(c,game.exit,left,top,game.time,mission.objective == "exit" or mission.exit_open)
   end
+  self.kitten_step = kitten_step(game.time)
+  local bob = self.pickup_motion and self.kitten_step or 0
+  self.kitten_on_screen = rescue and mission.carrying or false
   if mission and mission.kitten and not mission.carrying then
-    draw_kitten(c,round(mission.kitten.x)-left,round(mission.kitten.y)-top)
+    self.kitten_on_screen = draw_kitten(c,round(mission.kitten.x)-left,round(mission.kitten.y)-top,false,bob)
   end
   for _, plate in ipairs(game.reflectors) do
     local x, y = round(plate.x)-left, round(plate.y)-top
@@ -942,7 +974,7 @@ function View:draw(game)
   local nearest_enemy = show_threats and draw_threats(c,game,left,top,false)
   if game.frost_speed then danger_ring(c,px,py+4,8,0xa4cad8) end
   self:draw_actor(game,game:held_weapon(),px,py)
-  if rescue and mission.carrying then draw_kitten(c,px+8,py+4,true) end
+  if rescue and mission.carrying then draw_kitten(c,px+8,py+4,true,bob) end
   for _, particle in ipairs(game.particles) do
     if max(particle.z or 0, particle.ez or 0) < roof_height and particle.kind ~= "smoke" and particle.kind ~= "exhaust" then
       draw_particle(c,particle,left,top,game)
@@ -1007,7 +1039,7 @@ function View:draw(game)
     c:rect(19,y,122,1,BRASS)
     local result = "YOU ARE DOWN"
     if game.result == "won" then
-      result = rescue and "KITTEN SAFE" or mission and "MISSION CLEAR" or game.practice and "PRACTICE CLEARED" or "SOLDIER DOWN"
+      result = rescue and "KITTEN SAFE" or mission and "MISSION CLEAR" or "PRACTICE CLEARED"
     end
     local action = mission and game.result == "won" and "SELECT MISSIONS" or "SELECT RETRY"
     text(c,result,80-3*#result,y+7,BRASS)
