@@ -121,7 +121,7 @@ async function measure(native) {
     };
 
     await badge.press('back');
-    await badge.press('right');
+    await badge.press('up');
     await badge.frames(12);
     assert.equal(images.length, native ? 48 : 0);
     const frame = () => createHash('sha256').update(badge.rgba()).digest('hex');

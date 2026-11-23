@@ -10,8 +10,10 @@ local floor, min, max, sqrt = math.floor, math.min, math.max, math.sqrt
 local sin, cos, abs, exp = math.sin, math.cos, math.abs, math.exp
 local MOVE_SPEED, STEP_DISTANCE, FIRE_BUFFER = 104, 6, 0.10
 local PICKUP_RADIUS, MEDKIT_HP = 11, 30
+local HIT_POINTS, DEFEAT_POINTS, SCORE_BOOST_SECONDS = 10, 100, 10
 local HURT_DURATION, ROUTE_DURATION, ROUTE_TOLERANCE = 0.18, 0.16, 8
 local MAX_SCORCH_MARKS, SCORCH_MERGE_DISTANCE = 8, 8
+local MAX_ENDLESS_BODIES = 24
 local MAX_PARTICLES, MAX_PROJECTILES, PLAYER_PROJECTILE_RESERVE = 76, 32, 8
 local KNOCK_DECAY, RECOVER_AFTER = 12, 3
 local PLAYER_SURFACE = {name="PLAYER", health=100, radius=6, scale={}}
@@ -83,8 +85,9 @@ function Game.new(seed, drill, surveyed_ground, practice)
     health=PLAYER_SURFACE.health, surface=PLAYER_SURFACE, found=0, shots=0, hits=0,
     width=896, height=640, ground=ground, random=random(seed + 1),
     pickups=drill and {} or Range.pickups(x, y), targets=drill and {} or Range.targets(x, y),
-    reflectors=drill and {} or Range.reflectors(x, y), enemies={}, dt=0,
+    reflectors=drill and {} or Range.reflectors(x, y), enemies={}, bodies={}, dt=0,
     owned={[0]=true}, projectiles={}, particles={}, scorch_marks={}, time=0, cooldown=0,
+    score=(drill == "level" or drill == "endless") and 0 or nil,
     flash=0, message_until=0, dirty=true, drill=drill,
   }, Game)
   if drill == "level" then
@@ -157,7 +160,7 @@ function Game:nearest_pickup(collecting)
   local best, closest = math.huge, nil
   local wounded = self.health < self.surface.health
   for _, item in ipairs(self.pickups) do
-    if self:pickup_visible(item) and (item.id or wounded) then
+    if self:pickup_visible(item) and (item.kind ~= "medkit" or wounded) then
       local dx, dy = item.x - self.x, item.y - self.y
       local range = dx * dx + dy * dy
       if range < best and (not collecting or range <= PICKUP_RADIUS^2 and (not self.level
@@ -169,6 +172,11 @@ end
 
 function Game:message(text)
   self.notice, self.message_until, self.dirty = text, self.time + 1.4, true
+end
+
+function Game:add_score(points)
+  self.score = self.score + (self.score_boost and 2*points or points)
+  self.dirty = true
 end
 
 function Game:request_fire()
@@ -187,6 +195,10 @@ function Game:collect()
   if not item then return end
   if item.id then
     self:collect_weapon(item.id)
+  elseif item.kind == "hamburger" then
+    item.collected = true
+    self.score_boost, self.score_boost_until = SCORE_BOOST_SECONDS, self.time + SCORE_BOOST_SECONDS
+    self:message("HAMBURGER")
   else
     local restored = min(MEDKIT_HP, self.surface.health-self.health)
     item.collected, self.health = true, self.health+restored
@@ -732,10 +744,21 @@ function Game:damage(target, amount, effect, contacts)
   local on_hit = target.profile and target.profile.on_hit
   if on_hit and damage > 0 then on_hit(self, target, effect) end
   if target.home_x then target.reset_at = self.time + (target.health == 0 and 1.65 or 3) end
-  if target.health == 0 then target.burn = nil end
+  if target.health == 0 then
+    target.burn = nil
+    if damage > 0 and target.profile then
+      if self.score then self:add_score(DEFEAT_POINTS) end
+      local bodies = self.bodies
+      if self.drill == "endless" and #bodies == MAX_ENDLESS_BODIES then table.remove(bodies, 1) end
+      bodies[#bodies+1] = {x=target.x, y=target.y, roof=target.roof, skin=target.profile.skin}
+    end
+  end
   if contacts then
     local previous = contacts[target]
-    if not previous and target ~= self then self.hits = self.hits + 1 end
+    if not previous and target ~= self then
+      self.hits = self.hits + 1
+      if self.score and damage > 0 and target.profile then self:add_score(HIT_POINTS) end
+    end
     contacts[target] = (previous or 0) + damage
   end
   self.dirty = true
@@ -1226,6 +1249,11 @@ function Game:update(ms, keys)
   local dt = clamp(ms, 0, 80) / 1000
   self.dt = dt
   self.time, self.cooldown = self.time + dt, max(0, self.cooldown - dt)
+  if self.score_boost_until then
+    local seconds = math.ceil(self.score_boost_until - self.time - 1e-9)
+    if seconds <= 0 then self.score_boost_until, seconds = nil, nil end
+    if self.score_boost ~= seconds then self.score_boost, self.dirty = seconds, true end
+  end
   if self.grenade_ready_at and self.time >= self.grenade_ready_at then
     self.grenade_ready_at, self.dirty = nil, true
   end
@@ -1262,6 +1290,7 @@ function Game:update(ms, keys)
     self.result = drill_result(self)
     if self.result then
       self.projectiles, self.fire_until, self.charge_from = {}, nil, nil
+      self.score_boost, self.score_boost_until = nil, nil
       self.flash, self.hurt_until, self.camera_shake = 0, nil, nil
       self.burn = nil
       self:clear_frost(self)

@@ -22,5 +22,6 @@ return {
     {"enemy","soldier",184,72,7,1},
     {"enemy","soldier",280,152,7,1},
     {"enemy","runner",328,104,7,1},
+    {"hamburger",216,152},
   },
 }

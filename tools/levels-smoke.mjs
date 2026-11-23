@@ -9,7 +9,7 @@ import { cellFlags, cellOf, cellValue, materialMap, newLevel, tileKeysAt, toLua,
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const mosa = process.env.MOSA_BADGE_DIR ?? path.resolve(root, '..', 'mosa-badge');
-const { SolanaOS } = await import(pathToFileURL(path.join(mosa, 'tools', 'lib', 'host.mjs')));
+const { SolanaOS, WIDTH } = await import(pathToFileURL(path.join(mosa, 'tools', 'lib', 'host.mjs')));
 const app = process.env.DUST_RANGE_APP_DIR ?? path.join(root, 'apps', 'dust-range');
 const shots = process.argv[2];
 const readTiles = (file) => JSON.parse(fs.readFileSync(path.join(root, 'sprites', 'tiles', file), 'utf8'));
@@ -97,11 +97,13 @@ rescueFixture.loadout = [];
 assert.deepEqual(validate(rescueFixture, materials).map((issue) => issue.message),
   ['This objective needs a kitten.', 'This objective needs an exit.']);
 rescueFixture.entities.push({ type: 'kitten', x: 88, y: 24 }, { type: 'exit', x: 120, y: 56 });
+rescueFixture.entities.push({ type: 'hamburger', x: 56, y: 40 });
 assert.deepEqual(validate(rescueFixture, materials), []);
 assert.match(toLua(rescueFixture, materials), /\{"kitten",88,24\}/);
+assert.match(toLua(rescueFixture, materials), /\{"hamburger",56,40\}/);
 assert.ok(validate({ ...rescueFixture, entities: [...rescueFixture.entities, { type: 'kitten', x: 24, y: 24 }] }, materials)
   .some((issue) => issue.severity === 'error' && issue.message === 'Only one kitten is allowed.'));
-console.log('ok  builder validates and exports the kitten rescue objective');
+console.log('ok  builder validates and exports kitten rescues and hamburgers');
 
 // The campaign: every bundled mission validates, is a kitten rescue, and lets the player reach the
 // kitten and then the exit on foot, breaking destructible tiles where a level seals the kitten in.
@@ -293,6 +295,57 @@ check('view draws both exposed and hidden rooftop enemies and elevated fire', `l
   v:draw(g)
   return "ok"`, 'ok');
 
+check('enemy bodies stay on their floors after mission cleanup', `local g = fresh("roof-check")
+  local roof, indoor = g.enemies[1], g.enemies[2]
+  local v = View.new()
+  local rects = 0
+  v.canvas:remove()
+  v.canvas = {rect=function() rects = rects + 1 end, line=function() end, pixel=function() end}
+  local function drawn_rects()
+    rects = 0
+    v:draw(g)
+    return rects
+  end
+  g:damage(roof, roof.health, "impact")
+  g:damage(roof, roof.health, "impact")
+  run(g, 16)
+  assert(#g.enemies == 1 and #g.bodies == 1 and g.bodies[1].roof == roof.roof)
+  local with_roof_body = drawn_rects()
+  local bodies = g.bodies
+  g.bodies = {}
+  assert(drawn_rects() < with_roof_body, "the rooftop body is visible from outside")
+  g.bodies = bodies
+  g:damage(indoor, indoor.health, "impact")
+  run(g, 16)
+  assert(#g.enemies == 0 and #g.bodies == 2 and not g.bodies[2].roof and g.result == "won")
+  g.x, g.y = 72, 64
+  local inside = drawn_rects()
+  g.bodies = {bodies[2]}
+  assert(drawn_rects() == inside, "the cutaway hides the rooftop body")
+  g.bodies = {}
+  assert(drawn_rects() < inside, "the ground body is visible from inside")
+  v.strip:remove()
+  return "ok"`, 'ok');
+
+check('a pile of bodies draws no more than the newest six', `local g = fresh("roof-check")
+  local v = View.new()
+  local rects = 0
+  v.canvas:remove()
+  v.canvas = {rect=function() rects = rects + 1 end, line=function() end, pixel=function() end}
+  local function drawn_with(count)
+    g.bodies = {}
+    for i = 1, count do g.bodies[i] = {x=g.x-40+(i%6)*16, y=g.y-30+(i//6)*12, skin="soldier"} end
+    rects = 0
+    v:draw(g)
+    return rects
+  end
+  local none, six = drawn_with(0), drawn_with(6)
+  assert(six > none, "bodies draw")
+  assert(drawn_with(24) == six, "extra bodies are skipped")
+  g.bodies = {}
+  v.strip:remove()
+  return "ok"`, 'ok');
+
 check('level loads at spawn', `local g = fresh(); return string.format("%d,%d,%d,%d,%d", g.x, g.y, g.width, g.height, g.health)`, '24,264,768,512,130');
 check('Outpost medkit stays at full health, caps healing, and is consumed once', `local g = fresh()
   local kit
@@ -314,6 +367,39 @@ check('brick wall stops shots', `local g = fresh(); return tostring(Level.entry(
 check('wall opening lets shots through', `local g = fresh(); local t = Level.entry(g.level, centre(7), centre(1), 0, 1, 40); return tostring(t ~= nil and t > 40 or t == nil)`, 'true');
 check('wall opening blocks walking', `local g = fresh(); return tostring(Level.can_stand(g.level, centre(7), centre(3), 6))`, 'false');
 check('doorway is walkable', `local g = fresh(); return tostring(Level.can_stand(g.level, centre(9), centre(10), 6))`, 'true');
+check('exterior entrances face away from the roof on all four sides', `local g = fresh()
+  local entries = g.level.entrances
+  local count = 0
+  for _ in pairs(entries) do count = count + 1 end
+  return table.concat({count, entries[cell(g,18,20)], entries[cell(g,8,23)],
+    entries[cell(g,9,10)], entries[cell(g,36,7)]}, " ")`, '4 north east south west');
+
+lua(`
+  local g, v = fresh(), View.new()
+  function entrance_frame(inside)
+    g.x, g.y = centre(9), centre(inside and 9 or 12)
+    v:draw(g)
+  end
+  function close_entrance_frame()
+    v.canvas:show(false); v.strip:show(false)
+    entrance_frame, close_entrance_frame = nil, nil
+  end
+`);
+// The headless canvas stores BRASS in RGB565 and expands it back to RGB for screenshots.
+const lintelColor = [0xef, 0xd7, 0x94];
+const lintelPixel = (y) => {
+  const offset = (y * 2 * WIDTH + 80 * 2) * 4;
+  return [...badge.rgba().slice(offset, offset + 3)];
+};
+lua('entrance_frame(false)');
+assert.deepEqual(lintelPixel(17), lintelColor, 'entrance lintel is visible on the roof');
+if (shots) badge.screenshot(path.join(shots, 'entrance-outside.png'));
+lua('entrance_frame(true)');
+assert.notDeepEqual(lintelPixel(65), lintelColor, 'entrance lintel hides with the roof');
+if (shots) badge.screenshot(path.join(shots, 'entrance-inside.png'));
+lua('close_entrance_frame()');
+console.log('ok  exterior entrance renders with the roof and clears when the player enters');
+
 check('deep water blocks walking', `local g = fresh(); return tostring(Level.can_stand(g.level, centre(30), centre(5), 6))`, 'false');
 check('shots cross deep water', `local g = fresh(); return tostring(Level.entry(g.level, centre(28), centre(5), 1, 0, 70) == nil)`, 'true');
 check('rail pierces wood wall but not brick', `local g = fresh()
@@ -425,6 +511,75 @@ check('clearing waves opens the exit', `local g = fresh()
   return wave .. " " .. g.squad.wave .. " " .. tostring(g.result)`, '1 2 won');
 check('view draws a level frame', `local g = fresh(); local v = View.new(); v.canvas:show(false); v.strip:show(false); v:draw(g); g.x, g.y = centre(9), centre(6); v:draw(g); return "drawn"`, 'drawn');
 
+check('scoring counts each attack once per enemy and pays for a defeat once', `
+  local g = fresh("backyard")
+  local enemy, contacts = g.enemies[1], {}
+  g:damage(g, 1, "impact", {})
+  g:damage(enemy, 1, "spread", contacts)
+  g:damage(enemy, 1, "spread", contacts)
+  assert(g.score == 10)
+  g:damage(enemy, 999, "impact", {})
+  g:damage(enemy, 999, "impact", {})
+  assert(g.score == 120)
+  local endless = Game.new(427, "endless", {})
+  endless:damage(endless.enemies[1], 999, "burn")
+  assert(Game.new(427, "level", nil, "backyard").score == 0)
+  return endless.score
+`, 100);
+
+check('hamburger works at full health, refreshes 2X, and expires', `
+  local g = fresh("backyard")
+  local burger = assert(g:nearest_pickup())
+  assert(burger.kind == "hamburger" and g.health == g.surface.health)
+  g.x, g.y = burger.x, burger.y
+  run(g, 16)
+  assert(burger.collected and g.score_boost == 10)
+  g:damage(g.enemies[1], 1, "impact", {})
+  assert(g.score == 20)
+  local first_until = g.score_boost_until
+  g.time = first_until - 2
+  run(g, 16)
+  assert(g.score_boost == 2 and g.score_boost_until == first_until)
+  g.pickups[#g.pickups+1] = {kind="hamburger", x=g.x, y=g.y}
+  run(g, 16)
+  assert(g.score_boost == 10 and g.score_boost_until > first_until)
+  g:damage(g.enemies[1], 1, "impact", {})
+  assert(g.score == 40)
+  g.time = g.score_boost_until - 0.016
+  run(g, 16)
+  assert(not g.score_boost and not g.score_boost_until)
+  g:damage(g.enemies[1], 1, "impact", {})
+  return g.score
+`, 50);
+
+check('kitten and time points are awarded at extraction and the final score freezes', `
+  local function move_to(g, point)
+    g.x, g.y = point.x, point.y
+    run(g, 16)
+  end
+  local g = fresh("backyard")
+  g.time = 8
+  move_to(g, g:nearest_pickup())
+  move_to(g, g.mission.kitten)
+  assert(g.score == 0 and g.mission.carrying)
+  move_to(g, g.exit)
+  assert(g.result == "won" and g.time_bonus == 520 and g.score == 1520)
+  assert(not g.score_boost and not g.score_boost_until)
+  run(g, 100)
+  assert(g.score == 1520)
+  local slow = fresh("backyard")
+  slow.time = 61
+  move_to(slow, slow.mission.kitten)
+  move_to(slow, slow.exit)
+  assert(slow.result == "won" and slow.score == 500 and slow.time_bonus == 0)
+  local lost = fresh("backyard")
+  move_to(lost, lost.mission.kitten)
+  lost.health = 0
+  move_to(lost, lost.exit)
+  assert(lost.result == "lost" and not lost.time_bonus)
+  return lost.score
+`, 0);
+
 // Startup briefing, rescue, extraction, and the next mission.
 const status = () => lua('return table.concat({range_status()}, ",")').split(',');
 const position = () => status().slice(0, 2).map(Number);
@@ -451,12 +606,15 @@ if (shots) badge.screenshot(path.join(shots, 'mission-kitten.png'));
 if (shots) { await badge.frames(31); badge.screenshot(path.join(shots, 'mission-kitten-bob.png')); }
 await walk('down', 88);
 await walk('left', 24);
+if (shots) badge.screenshot(path.join(shots, 'mission-hamburger.png'));
 await badge.hold('down', 24);
 assert.equal(status()[14], 'won', 'carrying the kitten to the exit completes the mission');
+assert.deepEqual(JSON.parse(badge.storageJson()).mission_clears, { backyard: true }, 'winning saves the completed mission');
 if (shots) badge.screenshot(path.join(shots, 'mission-rescued.png'));
 await badge.press('select');
 assert.equal(status()[9], 'missions');
-if (shots) badge.screenshot(path.join(shots, 'missions-menu.png'));
+assert.equal(status()[19], '2', 'the map selects the next stop');
+if (shots) badge.screenshot(path.join(shots, 'mission-map.png'));
 await badge.press('select');
 assert.equal(status()[9], 'briefing');
 await badge.press('select');
@@ -464,29 +622,29 @@ await badge.frames(40);
 assert.deepEqual(position(), [40, 120], 'the next mission is Orchard');
 console.log('ok  game opens on Backyard, requires extraction, then offers Orchard');
 
-// The missions list holds only missions; Right opens the testing range on its own.
+// Follow the route in either direction, and leave for the range with Up.
 await badge.hold('back', Math.ceil(1240 / 16));
 assert.equal(status()[9], 'menu');
 await badge.press('down');
 await badge.press('down');
 await badge.press('select');
 assert.equal(status()[9], 'missions');
-await badge.press('up');
-await badge.press('up');
-await badge.press('down');
-await badge.press('down');
-await badge.press('down');
-assert.equal(status()[9], 'missions');
+await badge.press('left');
+await badge.press('left');
+assert.equal(status()[19], '1', 'the route stops at Backyard');
 await badge.press('right');
+assert.equal(status()[19], '2');
+await badge.press('up');
 assert.equal(status()[9], 'range');
-assert.equal(status()[12], 'range', 'Right on the missions list opens the testing range');
+assert.equal(status()[12], 'range', 'Up on the map opens the testing range');
 await badge.frames(30);
 await badge.hold('back', Math.ceil(1240 / 16));
 await badge.press('down');
 await badge.press('down');
 await badge.press('select');
 assert.equal(status()[9], 'missions');
-for (let i = 0; i < 8; i++) await badge.press("down");
+assert.equal(status()[19], '2', 'returning from the range focuses the next rescue');
+for (let i = 0; i < 7; i++) await badge.press('right');
 await badge.press('select');
 assert.equal(status()[9], 'briefing');
 if (shots) badge.screenshot(path.join(shots, 'outpost-briefing.png'));
@@ -501,4 +659,27 @@ if (shots) badge.screenshot(path.join(shots, 'level-fight.png'));
 assert.ok(peak < 160_000, `level callback budget regressed: ${peak}`);
 console.log(`ok  firefight within budget (${peak} / 200000 instructions)`);
 assert.deepEqual(badge.errors, []);
+
+// Reopen with the badge's saved progress and an additional exported mission.
+const expanded = new SolanaOS({ dir: app, storage: badge.storageDump() });
+const readExpanded = expanded.options.read;
+expanded.options.read = (file) => {
+  if (file === 'levels/index.lua') {
+    return readExpanded(file).replace(/\}\s*$/, '  {id="frontier-camp",name="Frontier Camp"},\n}\n');
+  }
+  return readExpanded(file);
+};
+await expanded.launch();
+installHeadlessClock(expanded, 16);
+const expandedStatus = () => expanded.lua('return table.concat({range_status()}, ",")').split(',');
+await expanded.frames(1);
+assert.equal(expandedStatus()[9], 'missions', 'returning players start on the map');
+assert.equal(expandedStatus()[19], '2', 'clears survive a relaunch');
+for (let i = 0; i < 10; i++) await expanded.press('right');
+assert.equal(expandedStatus()[19], '11', 'the route continues onto the next region and stops at the last mission');
+if (shots) expanded.screenshot(path.join(shots, 'mission-map-frontier.png'));
+await expanded.press('left');
+assert.equal(expandedStatus()[19], '10', 'Left crosses back to the first region');
+assert.deepEqual(expanded.errors, []);
+console.log('ok  saved progress resumes on the map and the route extends to a new region');
 console.log('all level checks passed');

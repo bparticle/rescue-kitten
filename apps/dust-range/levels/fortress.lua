@@ -47,5 +47,6 @@ return {
     {"enemy","warden",424,200,5,3},
     {"enemy","marksman",600,104,5,3,true},
     {"enemy","medic",392,280,5,3},
+    {"hamburger",424,408},
   },
 }

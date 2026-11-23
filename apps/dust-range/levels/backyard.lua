@@ -18,5 +18,6 @@ return {
     {"exit",24,120},
     {"kitten",152,88},
     {"enemy","soldier",120,120,1,1},
+    {"hamburger",88,88},
   },
 }

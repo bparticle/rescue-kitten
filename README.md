@@ -8,12 +8,14 @@ Open the [Solana OS app loader](https://solana.com/breakpoint/badge/apps/submit)
 
 Use Solana OS 2.0 or newer for the 6 MiB Lua heap. The app uses the LED permission. Solana OS 2.3 and later support its 16 ms tick request.
 
-Dustpaw has two modes: **Missions**, the main game, and the **Testing Range**. It opens on the title card for the first mission. Press **Select** to start, walk up to the kitten to pick it up, then carry it to the exit. After a successful rescue, **Select** opens **Missions** with the next one selected. Press **Cancel** on the title card to open the missions list, and press **Right** there to open the Testing Range. The range is also available from the mission pause menu, and the range pause menu leads back to Missions.
+Dustpaw has two modes: **Missions**, the main game, and the **Testing Range**. On your first launch, press **Select** on the title card to start Backyard or **Cancel** to open the **Mission Map**. Walk up to the kitten to pick it up, then carry it to the exit. After a successful rescue, press **Select** to return to the map. Completed missions are saved, and the map highlights the first unfinished mission when you return from a rescue or relaunch the game.
+
+On the map, press **Left/Right** to follow the route and **Select** to open any location's briefing. Press **Up** for the Testing Range. Both the map and the range are available from the mission pause menu.
 
 - **D-pad** moves the hero and sets the firing direction. Walk over a floating weapon to pick it up and equip it. When the nearest available pickup is at the edge of the screen or beyond it, the marker is amber for weapons and a green cross for medkits.
 - **Select** fires, throws, swings, or places the equipped item. Hold it for the rifle, flamethrower and cryo sprayer. Hold and release it to fire the charge cannon. The range has unlimited ammunition.
 - Tap **Cancel** to cycle through collected weapons and the unarmed stance. Hold **Cancel** for 1.2 seconds to pause at the menu.
-- In the menu, use **Up/Down** and **Select** to resume, open **Weapon Specs**, open **Missions**, start **Endless Run**, or exit. Use **Left/Right** on the pause menu to toggle pickup bobbing. In Weapon Specs, **Left/Right** browse weapons and **Select** goes to the next page. **Cancel** goes back one screen. **Home** returns directly to the launcher.
+- In the menu, use **Up/Down** and **Select** to resume, open **Weapon Specs**, open the **Mission Map**, start **Endless Run**, or exit. Use **Left/Right** on the pause menu to toggle pickup bobbing. In Weapon Specs, **Left/Right** browse weapons and **Select** goes to the next page. **Cancel** goes back one screen. **Home** returns directly to the launcher.
 - In **Weapon Specs**, press **Down** for the Enemy Field Guide. Browse enemy profiles with **Left/Right** and press **Select** to practice against that enemy. **Up** returns to Weapon Specs. The medic practice includes an injured ally so you can try interrupting the heal.
 
 The pickup message points toward that weapon's test target. The direction follows the D-pad, so tap toward the target before firing. You can shoot any target with any weapon.
@@ -25,6 +27,10 @@ The six top LEDs show the equipped weapon's family: 1 pistols (handgun, bankshot
 Your health is shown at the right of the HUD in every mode. Endless Run and enemy practice start at 100 HP; each mission sets its own starting health. When wounded, you also get a small bar above your character. The playfield border and two side LEDs flash on damage, and the HUD warns at 25 HP or below. The weapon-testing range is safe for testing your gear.
 
 Walk over a medkit in a mission to restore up to 30 HP. A medkit stays available until you pick it up while wounded.
+
+In Missions and Endless Run, earn 10 points per enemy hit and 100 extra when an enemy goes down. Multiple pellets from one shot award 10 points per enemy hit. Extracting with the kitten earns 500 points. Each successful mission also awards a time bonus that starts at 600 and drops by 10 per second of play.
+
+Walk over a hamburger to double combat and rescue points for 10 seconds. Another hamburger restarts the countdown. The HUD shows your score and the remaining boost time, and the mission results show the final score and time bonus.
 
 ## Missions
 
@@ -55,7 +61,7 @@ Ten kitten rescues, from a backyard with one guard to a three-wave assault on a 
 
 ## Level editor
 
-Run `node tools/level-builder/server.mjs` and open http://localhost:5178 to build missions. To make a rescue mission, choose **Rescue kitten and carry it to the exit**, then place a **Kitten** and an **Exit** with the Entities tool. Export the level to add it to **Missions**. [Level editor guide](docs/LEVELS.md)
+Run `node tools/level-builder/server.mjs` and open http://localhost:5178 to build missions. To make a rescue mission, choose **Rescue kitten and carry it to the exit**, then place a **Kitten** and an **Exit** with the Entities tool. Export the level to add it to the **Mission Map**. [Level editor guide](docs/LEVELS.md)
 
 ## Weapon and target specifications
 

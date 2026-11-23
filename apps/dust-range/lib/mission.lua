@@ -1,6 +1,7 @@
 -- Plays a level exported by tools/level-builder: spawn, loadout, enemy waves and the objective.
 local Mission = {}
 local BETWEEN_WAVES, WAKE_CALL, INTERACT_RADIUS = 1.6, 64, 10
+local RESCUE_POINTS, TIME_BONUS_MAX, TIME_BONUS_PER_SECOND = 500, 600, 10
 
 function Mission.start(game, id)
   local Level = require("lib.level")
@@ -35,6 +36,8 @@ function Mission.start(game, id)
       game.pickups[#game.pickups+1] = {id=entity[2], x=entity[3], y=entity[4]}
     elseif kind == "medkit" then
       game:add_medkit(entity[2], entity[3])
+    elseif kind == "hamburger" then
+      game.pickups[#game.pickups+1] = {kind=kind, x=entity[2], y=entity[3]}
     elseif kind == "exit" then
       game.exit = {x=entity[2], y=entity[3]}
     elseif kind == "kitten" then
@@ -90,6 +93,13 @@ local function in_reach(game, point)
   return dx*dx + dy*dy <= INTERACT_RADIUS^2 and not game:cover_entry(game.x,game.y,dx,dy,1,0,"walk")
 end
 
+local function complete(game)
+  if game.mission.objective == "rescue-kitten" then game:add_score(RESCUE_POINTS) end
+  game.time_bonus = math.max(0, TIME_BONUS_MAX - math.floor(game.time + 1e-9)*TIME_BONUS_PER_SECOND)
+  game.score = game.score + game.time_bonus
+  return "won"
+end
+
 function Mission.update(game)
   local squad, mission = game.squad, game.mission
   for index = #game.enemies, 1, -1 do
@@ -116,7 +126,7 @@ function Mission.update(game)
 
   if game.exit and in_reach(game, game.exit) then
     if mission.objective == "exit" or (mission.objective == "clear-exit" and remaining == 0)
-      or (rescue and mission.carrying) then return "won" end
+      or (rescue and mission.carrying) then return complete(game) end
     if not mission.exit_hint then
       if rescue then game:message("FIND THE KITTEN FIRST")
       elseif mission.objective == "clear-exit" then game:message("CLEAR THE AREA FIRST") end
@@ -139,7 +149,7 @@ function Mission.update(game)
     game:message("WAVE CLEAR")
     return
   end
-  if mission.objective == "clear" then return "won" end
+  if mission.objective == "clear" then return complete(game) end
   if mission.objective == "clear-exit" and not mission.exit_open then
     mission.exit_open = true
     game:message("AREA CLEAR  REACH THE EXIT")

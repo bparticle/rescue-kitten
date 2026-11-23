@@ -15,6 +15,8 @@ local SHADOW, PLATE = 0x7b6b57, 0x474841
 local HP_GREEN, HP_AMBER, HP_RED = 0xb4cc92, 0xe4bd75, 0xff9278
 local PICKUP_LIFT = {3,3,4,5,5,6,6,6,5,5,4,3}
 local MEDKIT_MID, MEDKIT_DARK = 0x8fa375, 0x40563d
+local BURGER_GOLD = 0xffc16a
+local pickup_colors = {medkit=HP_GREEN, hamburger=BURGER_GOLD}
 local function skin(light, shade, dark, hood)
   return setmetatable({[6]=light, [8]=shade, [9]=dark, [22]=hood}, {__index=palette.colors})
 end
@@ -241,18 +243,54 @@ local function draw_tile(self, c, tile, x, y)
   if tile.detail then draw_tile_art(self, c, tile.detail, x, y) end
 end
 
+-- The entrance is a recessed opening in the eave. Depth is measured inward from the edge.
+local entrance_rects = {
+  {2,0,12,8,INK},
+  {3,1,1,6,SHADOW}, {12,1,1,6,SHADOW},
+  {3,6,10,1,BRASS},
+  {4,0,8,2,SHADOW}, {4,0,8,1,DIM},
+}
+
+-- Resolve each facing once into flat x, y, w, h, color runs.
+local entrance_runs = {}
+for _, facing in ipairs({"north", "south", "west", "east"}) do
+  local side = facing == "west" or facing == "east"
+  local reverse = facing == "south" or facing == "east"
+  local runs = {}
+  for _, part in ipairs(entrance_rects) do
+    local offset, depth, width, height, color = part[1], part[2], part[3], part[4], part[5]
+    if reverse then depth = 16-depth-height end
+    if side then runs[#runs+1] = {depth,offset,height,width,color}
+    else runs[#runs+1] = {offset,depth,width,height,color} end
+  end
+  entrance_runs[facing] = runs
+end
+
+local function draw_entrance(c, x, y, facing)
+  local runs = entrance_runs[facing]
+  for i = 1, #runs do
+    local r = runs[i]
+    c:rect(x+r[1],y+r[2],r[3],r[4],r[5])
+  end
+end
+
 local function draw_level(self, c, level, left, top, layer, hidden, tall_only)
   local cells, w = level[layer], level.w
   local region = level.region
+  local entrances = layer == "roof" and level.entrances
   local x0, y0 = max(0, left//16), max(0, top//16)
   local x1, y1 = min(w-1, (left+FIELD_W-1)//16), min(level.h-1, (top+FIELD_H-1)//16)
   for y = y0, y1 do
     local row, py = y*w + 1, y*16-top
     for x = x0, x1 do
-      local tile = cells[row+x]
-      if tile and not (hidden and region[row+x] == hidden)
-        and (not tall_only or region[row+x] and (tile.def.height or 0) > level.roof_height) then
-        draw_tile(self, c, tile, x*16-left, py)
+      local i = row+x
+      local tile = cells[i]
+      if tile and not (hidden and region[i] == hidden)
+        and (not tall_only or region[i] and (tile.def.height or 0) > level.roof_height) then
+        local px = x*16-left
+        draw_tile(self, c, tile, px, py)
+        local facing = entrances and entrances[i]
+        if facing then draw_entrance(c, px, py, facing) end
       end
     end
   end
@@ -332,16 +370,30 @@ local function draw_medkit(c, x, y)
   c:rect(x,y-3,1,5,MEDKIT_DARK)
 end
 
+local function draw_hamburger(c, x, y)
+  c:rect(x-4,y-6,9,11,INK)
+  c:rect(x-6,y-4,13,8,INK)
+  c:rect(x-3,y-5,7,2,BURGER_GOLD)
+  c:rect(x-5,y-3,11,2,0xdc913e)
+  c:pixel(x+2,y-4,TEXT)
+  c:rect(x-5,y-1,11,1,HP_GREEN)
+  c:rect(x-4,y,9,1,0x854635)
+  c:rect(x-4,y+1,9,2,0xdc913e)
+  c:rect(x-3,y+1,7,1,BURGER_GOLD)
+end
+
 local function draw_pickup(c, item, x, y, step, focused)
   local icon = icons[item.id]
   local lift = step and PICKUP_LIFT[(step+(item.x+item.y)//12) % #PICKUP_LIFT+1] or 4
   local half = max(4, (icon and icon[1] or 13)//3) - (lift >= 5 and 1 or 0)
-  local accent = icon and (focused and BRASS or 0xc5ab76) or (focused and HP_GREEN or MEDKIT_MID)
+  local accent = item.kind == "medkit" and (focused and HP_GREEN or MEDKIT_MID)
+    or pickup_colors[item.kind] or (focused and BRASS or 0xc5ab76)
   c:rect(x-half+1,y+4,2*half-1,3,SHADOW)
   c:rect(x-half,y+5,2*half+1,1,0x625445)
   c:rect(x-half-4,y+5,2,1,accent)
   c:rect(x+half+3,y+5,2,1,accent)
   if icon then stamp(c,icon[3],x-icon[1]//2,y-lift-icon[2]//2)
+  elseif item.kind == "hamburger" then draw_hamburger(c,x,y-lift)
   else draw_medkit(c,x,y-lift) end
 end
 
@@ -472,8 +524,13 @@ local function locator(c, item, left, top, px, py, color)
   local mx, my = round(px+dx*distance), round(py+dy*distance)
   c:rect(mx-4,my-4,9,9,INK)
   c:rect(mx-2,my-2,5,5,color or BRASS)
-  if color then c:rect(mx,my-1,1,3,INK) else c:pixel(mx,my,INK) end
-  if item.kind == "medkit" then c:rect(mx-1,my,3,1,INK) end
+  if item.kind == "hamburger" then
+    c:rect(mx-1,my-1,3,1,INK)
+    c:rect(mx-1,my+1,3,1,INK)
+  else
+    if color then c:rect(mx,my-1,1,3,INK) else c:pixel(mx,my,INK) end
+    if item.kind == "medkit" then c:rect(mx-1,my,3,1,INK) end
+  end
 end
 
 local function draw_shot(c, shot, left, top, time)
@@ -732,6 +789,34 @@ function View:draw_enemy(enemy, left, top)
   end
 end
 
+-- A body costs about 100 rects, so each floor draws only the newest few on screen.
+local MAX_DRAWN_BODIES = 6
+local body_art
+local visible_bodies = {}
+local function draw_bodies(c, bodies, left, top, on_roof, hidden_roof)
+  if #bodies == 0 then return end
+  body_art = body_art or require("art.enemy-bodies")
+  local half_w, half_h = body_art.w//2, body_art.h//2
+  local count = 0
+  for index = #bodies, 1, -1 do
+    local body = bodies[index]
+    if (on_roof and body.roof and body.roof ~= hidden_roof) or (not on_roof and not body.roof) then
+      local x, y = round(body.x)-left, round(body.y)-top
+      if x >= -half_w and x < FIELD_W+half_w and y >= -half_h and y < FIELD_H+half_h then
+        count = count + 1
+        visible_bodies[count] = body
+        if count == MAX_DRAWN_BODIES then break end
+      end
+    end
+  end
+  -- Oldest first, so newer bodies land on top.
+  for index = count, 1, -1 do
+    local body = visible_bodies[index]
+    visible_bodies[index] = nil
+    stamp(c,body_art[body.skin],round(body.x)-left-half_w,round(body.y)-top-half_h,1,body_art.colors)
+  end
+end
+
 local function draw_arena(c, arena, left, top)
   local x0, x1 = arena.left-left, arena.right-left
   local y0, y1 = arena.top-top, arena.bottom-top
@@ -868,14 +953,25 @@ local function hud(c, game)
     elseif game.burn then condition, condition_color = "BURNING", HP_AMBER
     elseif game.frost_speed then condition, condition_color = "CHILLED", 0xa4cad8
     elseif ratio > 0 and ratio <= 0.25 and not game.result then condition, condition_color = "LOW HP", HP_RED end
-    local hint = "D-PAD MOVE  SELECT FIRE  CANCEL GEAR / HOLD MENU"
-    local notice = game.notice or hint
-    if condition then
-      local x = W-6*#condition-7
-      text(c,condition,x,16,condition_color)
-      notice = (game.notice or "MOVE WITH D-PAD  SELECT FIRE"):sub(1,(x-13)//6)
+    local right = W-7
+    if game.score then
+      local score = "SCORE " .. game.score
+      right = right-6*#score
+      text(c,score,right,16,BRASS)
+      if game.score_boost then
+        local boost = "2X " .. game.score_boost .. "S"
+        right = right-6*#boost-7
+        text(c,boost,right,16,BURGER_GOLD)
+      end
     end
-    text(c,notice,7,16,game.notice and BRASS or DIM)
+    if condition then
+      right = right-6*#condition-(game.score and 7 or 0)
+      text(c,condition,right,16,condition_color)
+    end
+    local hint = (game.score or condition) and "D-PAD MOVE  SELECT FIRE"
+      or "D-PAD MOVE  SELECT FIRE  CANCEL GEAR / HOLD MENU"
+    local notice = game.notice or hint
+    text(c,notice:sub(1,max(0,(right-13)//6)),7,16,game.notice and BRASS or DIM)
     return
   end
   for slot = 1, #Game.weapons do
@@ -914,7 +1010,6 @@ function View:draw(game)
     if self.tile_images == nil then self.tile_images = (ui.load and c.image) and {} or false end
     if not self.tiles then c:rect(0,0,FIELD_W,FIELD_H,palette.ground) end
     draw_level(self, c, level, left, top, "ground")
-    draw_level(self, c, level, left, top, "structure")
   else
     ground(c, game.ground, left, top, self.tiles)
   end
@@ -925,6 +1020,8 @@ function View:draw(game)
       effects.stamp(c,effects.scorch,x,y)
     end
   end
+  draw_bodies(c,game.bodies,left,top,false)
+  if level then draw_level(self,c,level,left,top,"structure") end
   if game.cover then draw_cover(c,game.cover,left,top) end
   local mission = game.mission
   local rescue = mission and mission.objective == "rescue-kitten"
@@ -1000,6 +1097,7 @@ function View:draw(game)
           effects.stamp(c,effects.scorch,x,y)
         end
       end
+      draw_bodies(c,game.bodies,left,top,true,hidden_roof)
       for _, shot in ipairs(game.projectiles) do
         if (shot.z or 0) >= roof_height then draw_shot(c,shot,left,top,game.time) end
       end
@@ -1021,7 +1119,7 @@ function View:draw(game)
     local ratio = game.health/game.surface.health
     health_bar(c,max(0,min(FIELD_W-19,px-9)),py < 14 and py+10 or py-14,19,4,ratio,health_color(game,ratio))
   end
-  if closest then locator(c,closest,left,top,px,py,closest.kind == "medkit" and HP_GREEN or nil) end
+  if closest then locator(c,closest,left,top,px,py,pickup_colors[closest.kind]) end
   if rescue and not game.result then
     local goal = mission.carrying and game.exit or mission.kitten
     if goal then locator(c,goal,left,top,px,py,0xf1a76e) end
@@ -1034,8 +1132,9 @@ function View:draw(game)
     c:rect(FIELD_W-1,0,1,FIELD_H,color)
   end
   if game.result then
-    local y = 31
-    c:rect(19,y,122,34,INK)
+    local details = game.time_bonus and 22 or game.score and 11 or 0
+    local y = game.practice and game.result == "won" and 4 or 31-details//2
+    c:rect(19,y,122,34+details,INK)
     c:rect(19,y,122,1,BRASS)
     local result = "YOU ARE DOWN"
     if game.result == "won" then
@@ -1043,7 +1142,15 @@ function View:draw(game)
     end
     local action = mission and game.result == "won" and "SELECT MISSIONS" or "SELECT RETRY"
     text(c,result,80-3*#result,y+7,BRASS)
-    text(c,action,80-3*#action,y+21,TEXT)
+    if game.score then
+      local score = "SCORE " .. game.score
+      text(c,score,80-3*#score,y+18,TEXT)
+    end
+    if game.time_bonus then
+      local bonus = "TIME BONUS +" .. game.time_bonus
+      text(c,bonus,80-3*#bonus,y+29,BURGER_GOLD)
+    end
+    text(c,action,80-3*#action,y+21+details,TEXT)
   end
   local wave, remaining
   if game.squad then wave, remaining = game.squad.wave, game.squad.remaining end
@@ -1052,6 +1159,7 @@ function View:draw(game)
     or self.hits ~= game.hits or self.notice ~= game.notice or self.health ~= game.health
     or self.wave ~= wave or self.remaining ~= remaining or self.hurt_until ~= game.hurt_until
     or self.result ~= game.result or self.burning ~= burning or self.chilled ~= chilled
+    or self.score ~= game.score or self.score_boost ~= game.score_boost
     or self.carrying ~= (mission and mission.carrying) then
     hud(self.strip,game)
     self.game, self.health = game, game.health
@@ -1059,6 +1167,7 @@ function View:draw(game)
     self.wave, self.remaining = wave, remaining
     self.hurt_until = game.hurt_until
     self.result, self.burning, self.chilled = game.result, burning, chilled
+    self.score, self.score_boost = game.score, game.score_boost
     self.carrying = mission and mission.carrying
   end
 end

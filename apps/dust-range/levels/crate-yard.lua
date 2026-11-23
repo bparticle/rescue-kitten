@@ -26,5 +26,6 @@ return {
     {"enemy","scatterguard",392,120,6,1},
     {"enemy","lobber",408,248,7,1},
     {"enemy","runner",472,216,7,1},
+    {"hamburger",168,184},
   },
 }

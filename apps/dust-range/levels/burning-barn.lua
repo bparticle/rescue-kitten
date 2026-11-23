@@ -31,5 +31,6 @@ return {
     {"enemy","cinder",552,264,7,2},
     {"enemy","bruiser",440,376,8,2},
     {"enemy","runner",488,40,6,2},
+    {"hamburger",408,216},
   },
 }

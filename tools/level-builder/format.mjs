@@ -452,7 +452,7 @@ export function validate(level, materials) {
     const cell = Number.isFinite(entity.x) && Number.isFinite(entity.y) ? cellOf(level, x, y) : -1;
     const label = entity.type === 'enemy' ? `${entity.kind} (wave ${entity.wave || 1})`
       : entity.type === 'pickup' ? `${WEAPONS[entity.weapon] || 'Unknown weapon'} pickup` : entity.type;
-    if (!['spawn', 'enemy', 'pickup', 'medkit', 'kitten', 'exit'].includes(entity.type)) {
+    if (!['spawn', 'enemy', 'pickup', 'medkit', 'hamburger', 'kitten', 'exit'].includes(entity.type)) {
       add('error', 'Unknown entity type.', entity);
       continue;
     }

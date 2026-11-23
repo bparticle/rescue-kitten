@@ -644,7 +644,7 @@ try {
   assert.equal(state().scene, 'briefing');
   await badge.press('back');
   assert.equal(state().scene, 'missions');
-  await badge.press('right');
+  await badge.press('up');
   await badge.frames(10);
   assert.equal(state().weapon, 0);
   assert.equal(state().found, 0);

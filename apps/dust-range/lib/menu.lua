@@ -10,7 +10,7 @@ local range_options = {
   {"resume", "RESUME RANGE"}, {"specs", "WEAPON SPECS"}, {"endless", "ENDLESS RUN"}, {"exit", "EXIT GAME"},
 }
 local level_options = {
-  {"resume", "RESUME RANGE"}, {"specs", "WEAPON SPECS"}, {"missions", "MISSIONS"},
+  {"resume", "RESUME RANGE"}, {"specs", "WEAPON SPECS"}, {"missions", "MISSION MAP"},
   {"endless", "ENDLESS RUN"}, {"exit", "EXIT GAME"},
 }
 -- Endless Run and enemy practice from the field guide.
@@ -19,7 +19,7 @@ local drill_options = {
   {"range", "BACK TO RANGE"}, {"exit", "EXIT GAME"},
 }
 local mission_options = {
-  {"resume", "RESUME"}, {"drill", "RETRY MISSION"}, {"missions", "MISSIONS"},
+  {"resume", "RESUME"}, {"drill", "RETRY MISSION"}, {"missions", "MISSION MAP"},
   {"range", "TESTING RANGE"}, {"exit", "EXIT GAME"},
 }
 
@@ -304,7 +304,7 @@ function Menu:draw_briefing(level, index, rest)
       stamp(c,title.right,160,0,2,title.colors)
       return false
     end
-    frame(c,"SELECT START", "CANCEL MISSIONS")
+    frame(c,"SELECT START", "CANCEL MAP")
     c:rect(0,0,320,176,title.background)
     stamp(c,title.left,0,0,2,title.colors)
     c:rect(0,176,320,21,INK)
@@ -314,7 +314,7 @@ function Menu:draw_briefing(level, index, rest)
     text(c,goal[3],181,188,TEXT)
     return true
   end
-  frame(c,"SELECT START", "CANCEL MISSIONS")
+  frame(c,"SELECT START", "CANCEL MAP")
 
   text(c,"DUSTPAW",18,18,DIM)
   right(c,string.format("MISSION %02d",index),302,18,BRASS)
@@ -342,41 +342,6 @@ function Menu:draw_briefing(level, index, rest)
     c:rect(220,153,52,8,0x35382d)
     c:rect(228,150,36,14,0x35382d)
     stamp(c,kitten.art,247-(kitten.w*4)//2,108,4,kitten.colors)
-  end
-end
-
--- Exported levels in mission order. The testing range is its own mode, opened with Right.
-function Menu:draw_missions(choice, levels)
-  local c = self.canvas
-  frame(c,"SELECT OPEN  RIGHT TESTING RANGE","CANCEL BACK")
-  text(c,"MISSIONS",14,19,BRASS,3)
-  c:rect(14,53,292,1,BORDER)
-  local visible = 7
-  local first = math.max(1, math.min(choice-3, #levels-visible+1))
-  for row = 0, visible-1 do
-    local index = first + row
-    local level = levels[index]
-    if not level then break end
-    local y = 62 + row*19
-    local selected = index == choice
-    c:rect(14,y,174,16,selected and BRASS or PANEL)
-    c:rect(14,y,3,16,selected and 0xb5744e or BORDER)
-    text(c,string.format("%02d ",index) .. level.name:upper():sub(1,22),24,y+5,selected and INK or TEXT)
-  end
-  local level = levels[choice]
-  c:rect(198,62,108,128,BORDER)
-  c:rect(199,63,106,126,PANEL)
-  local rows = {
-    {"GOAL", (objectives[level.objective] or objectives.clear)[1]},
-    {"SIZE", (level.w or 0) .. "X" .. (level.h or 0)},
-    {"ENEMIES", tostring(level.enemies or 0)},
-    {"WAVES", tostring(level.waves or 1)},
-    {"HP", tostring(level.health or 100)},
-  }
-  for index, row in ipairs(rows) do
-    local y = 70 + (index-1)*22
-    text(c,row[1],205,y,DIM)
-    text(c,row[2],205,y+10,BRASS)
   end
 end
 

@@ -134,8 +134,23 @@ def main():
     colors = ','.join('0x%02x%02x%02x' % color for color in kitten_palette)
     write_module('kitten', ['return {', f'  w={kitten.width}, h={kitten.height},',
                             f'  colors={{{colors}}},', f'  art={art},', '}'])
+    enemy_bodies()
     title_card()
     level_tiles()
+
+
+def enemy_bodies():
+    entities = SPRITES / 'entities'
+    layout = json.loads((entities / 'enemy-bodies-layout.json').read_text())
+    width, height = layout['frameWidth'], layout['frameHeight']
+    names = layout['rows']
+    frames = cells(read_png(entities / layout['image']), width, height, len(names[0]), len(names))
+    palette = {}
+    art = [f'  {name}={pack(frame, palette)},'
+           for names_row, frames_row in zip(names, frames)
+           for name, frame in zip(names_row, frames_row)]
+    colors = ','.join('0x%02x%02x%02x' % color for color in palette)
+    write_module('enemy-bodies', ['return {', f'  w={width}, h={height},', f'  colors={{{colors}}},', *art, '}'])
 
 
 def title_card():

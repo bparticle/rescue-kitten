@@ -8,14 +8,16 @@ Dustpaw levels are tile maps built with the local level builder and exported as 
 node tools/level-builder/server.mjs
 ```
 
-Open http://localhost:5178. Saved levels go to `levels/<id>.json`. **Export to badge** writes `apps/dust-range/levels/<id>.lua` and rebuilds `levels/index.lua`, which adds the level to **Missions**. Set **Menu order** to place it. The first mission in menu order opens at launch on the title card. **Briefing** is an optional line shown on the mission's briefing screen. It wraps to two lines of 27 characters, and the badge font has letters, digits and `/ . % < > + -`. **Build ZIP** runs `tools/package.py`.
+Open http://localhost:5178. Saved levels go to `levels/<id>.json`. **Export to badge** writes `apps/dust-range/levels/<id>.lua` and rebuilds `levels/index.lua`, which adds the level to the **Mission Map**. Set **Menu order** to place it on the route. **Briefing** is an optional line shown on the mission's briefing screen. It wraps to two lines of 27 characters, and the badge font has letters, digits and `/ . % < > + -`. **Build ZIP** runs `tools/package.py`.
+
+Each map region holds up to ten locations. Further exports continue the same route onto the next region. New missions use a camp illustration by default. To give a mission its own landmark, add its level ID and drawing to `tools/draw_overworld.py` and run `python tools/draw_overworld.py` to regenerate the packed artwork. Completion is saved by level ID, so reordering missions keeps their cleared status.
 
 | Key | Tool |
 | --- | --- |
 | B / R / F / E | Paint, rectangle (Shift for an outline), flood fill, erase |
 | I or Alt+click | Pick the tile under the cursor |
 | H | House: walls, floor, roof, a south doorway and optional wall openings in one drag |
-| N | Entities: player spawn, enemies (kind, facing, wave, surface), weapon pickups, medkits, kitten, exit |
+| N | Entities: player spawn, enemies (kind, facing, wave, surface), weapon pickups, medkits, hamburgers, kitten, exit |
 | Space or right-drag, wheel | Pan and zoom |
 | 1 / 2 / 3, [ / ] | Ground, structure and roof layer, brush size |
 | O / T / G | Cycle collision overlay, roof display, grid |
@@ -23,7 +25,7 @@ Open http://localhost:5178. Saved levels go to `levels/<id>.json`. **Export to b
 
 Other tools:
 
-- `node tools/levels-smoke.mjs` checks rooftop combat, tile interactions, Outpost, every bundled mission (valid, a kitten rescue, kitten and exit reachable), the level menu and the badge's per-tick budget in the headless host.
+- `node tools/levels-smoke.mjs` checks rooftop combat, tile interactions, Outpost, every bundled mission (valid, a kitten rescue, kitten and exit reachable), the mission map and the badge's per-tick budget in the headless host.
 - `node tools/level-builder/campaign.mjs` drafted the ten missions. It skips levels that already exist in `levels/`, so builder edits are safe. `--force` redrafts and overwrites them, and you can name level ids to redraft only those.
 - `node tools/level-builder/export.mjs` re-exports every level in `levels/` without the editor, for example after changing tile properties.
 - `python tools/draw_tiles.py` redraws `sprites/tiles/tileset.png`. `python tools/build_assets.py` packs it with the properties into `art/tiles.lua`.
@@ -41,6 +43,8 @@ Other tools:
 Set **Objective** to **Rescue kitten and carry it to the exit**. Place one **Kitten** and one **Exit** with the Entities tool, then export the level. The player picks up the kitten by walking up to it and completes the mission at the exit. Enemy waves are optional. All ten bundled missions are rescues: open `backyard` for the simplest one.
 
 The builder warns when the kitten **cannot be reached on foot**. Crate Yard and Cold Storage do this on purpose: crates and brick walls seal the kitten in, and the player breaks through. `levels-smoke.mjs` checks that destructible tiles open a way through in every bundled mission.
+
+Place a **Hamburger** from the Entities tool to give players 10 seconds of double combat and rescue points when they walk over it.
 
 ## Rooftop enemies
 

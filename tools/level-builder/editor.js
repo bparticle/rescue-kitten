@@ -314,15 +314,16 @@ function drawEntity(entity) {
       vctx.font = 'bold 6px monospace';
       vctx.fillText('YOU', x - 6, y - 11);
     }
-  } else if (entity.type === 'pickup' || entity.type === 'medkit') {
+  } else if (['pickup', 'medkit', 'hamburger'].includes(entity.type)) {
     const icon = state.img.weapons[entity.weapon];
     const medkit = entity.type === 'medkit';
+    const hamburger = entity.type === 'hamburger';
     const half = Math.max(4, Math.floor((icon?.width || 13) / 3));
     vctx.fillStyle = '#7b6b57';
     vctx.fillRect(x - half + 1, y + 4, 2 * half - 1, 3);
     vctx.fillStyle = '#625445';
     vctx.fillRect(x - half, y + 5, 2 * half + 1, 1);
-    vctx.fillStyle = medkit ? '#b4cc92' : '#ecd590';
+    vctx.fillStyle = medkit ? '#b4cc92' : hamburger ? '#ffc16a' : '#ecd590';
     vctx.fillRect(x - half - 4, y + 5, 2, 1);
     vctx.fillRect(x + half + 3, y + 5, 2, 1);
     if (medkit) {
@@ -335,6 +336,22 @@ function drawEntity(entity) {
       vctx.fillStyle = '#40563d';
       vctx.fillRect(x - 2, y - 5, 5, 1);
       vctx.fillRect(x, y - 7, 1, 5);
+    } else if (hamburger) {
+      vctx.fillStyle = '#262320';
+      vctx.fillRect(x - 4, y - 10, 9, 11);
+      vctx.fillRect(x - 6, y - 8, 13, 8);
+      vctx.fillStyle = '#dc913e';
+      vctx.fillRect(x - 5, y - 7, 11, 2);
+      vctx.fillRect(x - 4, y - 3, 9, 2);
+      vctx.fillStyle = '#ffc16a';
+      vctx.fillRect(x - 3, y - 9, 7, 2);
+      vctx.fillRect(x - 3, y - 3, 7, 1);
+      vctx.fillStyle = '#b4cc92';
+      vctx.fillRect(x - 5, y - 5, 11, 1);
+      vctx.fillStyle = '#854635';
+      vctx.fillRect(x - 4, y - 4, 9, 1);
+      vctx.fillStyle = '#f6e9d0';
+      vctx.fillRect(x + 2, y - 8, 1, 1);
     } else if (icon) {
       vctx.drawImage(icon, x - Math.floor(icon.width / 2), y - 4 - Math.floor(icon.height / 2));
     }

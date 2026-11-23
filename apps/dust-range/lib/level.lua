@@ -145,6 +145,19 @@ local function label_roofs(level)
   level.region = region
 end
 
+local function entrance_facing(roof, i, w, h, variant)
+  -- A doorway crosses the wall at right angles. Exactly one side must lead under the roof.
+  if variant == 1 then
+    local north = i > w and roof[i-w] ~= nil
+    local south = i <= w*(h-1) and roof[i+w] ~= nil
+    if north ~= south then return north and "south" or "north" end
+  else
+    local west = (i-1) % w > 0 and roof[i-1] ~= nil
+    local east = i % w ~= 0 and roof[i+1] ~= nil
+    if west ~= east then return west and "east" or "west" end
+  end
+end
+
 function Level.new(def)
   local w, h = def.w, def.h
   local level = {def=def, w=w, h=h, records={}, flow={}, version=0, roof_height=ROOF_HEIGHT}
@@ -152,12 +165,17 @@ function Level.new(def)
   level.ground = decode_layer(level, def.ground, legend.ground, widths.ground or 1, w*h)
   level.structure = decode_layer(level, def.structure, legend.structure, widths.structure or 1, w*h)
   level.roof = decode_layer(level, def.roof, legend.roof, widths.roof or 1, w*h)
-  level.mask, level.hp = {}, {}
+  level.mask, level.hp, level.entrances = {}, {}, {}
   for i = 1, w*h do
     local structure = level.structure[i]
     level.mask[i] = cell_mask(level.ground[i], structure)
     if structure and structure.def.hp then level.hp[i] = structure.def.hp end
-    if structure and level.roof[i] and (structure.def.height or 0) > ROOF_HEIGHT then level.tall_roof_props = true end
+    if structure and level.roof[i] then
+      if structure.id == "doorway" then
+        level.entrances[i] = entrance_facing(level.roof, i, w, h, structure.variant)
+      end
+      if (structure.def.height or 0) > ROOF_HEIGHT then level.tall_roof_props = true end
+    end
     pause(i)
   end
   label_roofs(level)

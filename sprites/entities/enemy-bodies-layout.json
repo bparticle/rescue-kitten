@@ -1,0 +1,10 @@
+{
+  "image": "enemy-bodies.png",
+  "frameWidth": 28,
+  "frameHeight": 20,
+  "rows": [
+    ["soldier", "runner", "rifleman", "scatterguard"],
+    ["lobber", "warden", "skirmisher", "medic"],
+    ["bruiser", "marksman", "cinder", "cryo"]
+  ]
+}

@@ -3,6 +3,7 @@ local View = require("lib.view")
 local Menu = require("lib.menu")
 local Indicators = require("lib.indicators")
 local Enemies = require("lib.enemies")
+local Overworld = require("lib.overworld")
 
 local SEED = 427
 local range = Game.new(SEED)
@@ -18,6 +19,7 @@ local cancel_pressed_at, resume_keys, menu_dirty
 local has_index, levels = pcall(require, "levels.index")
 if not has_index or type(levels) ~= "table" then levels = {} end
 local has_levels, level_choice = #levels > 0, 1
+local overworld = Overworld.new(levels, storage)
 local briefing_choice, active_mission, missions_back = 1, nil, "briefing"
 screen:loading()
 if indicators then indicators:clear() end
@@ -59,7 +61,14 @@ local function open_range()
   resume_game()
 end
 
-if has_levels then show_briefing(1) end
+if has_levels then
+  if overworld.count > 0 then
+    briefing_choice = overworld:next_mission() or #levels
+    show_missions("briefing", briefing_choice)
+  else
+    show_briefing(1)
+  end
+end
 
 local function retry()
   if game.mission then show_briefing(active_mission)
@@ -86,12 +95,14 @@ local function navigate(key, repeated)
       start_game("level", levels[active_mission].id)
     end
   elseif scene == "missions" then
-    if key == "up" or key == "down" then
-      level_choice = (level_choice - 1 + (key == "up" and -1 or 1)) % #levels + 1
-      menu_dirty = true
+    if key == "left" or key == "right" then
+      local next_choice = math.max(1, math.min(#levels, level_choice + (key == "left" and -1 or 1)))
+      if next_choice ~= level_choice then
+        level_choice, menu_dirty = next_choice, true
+      end
     elseif key == "select" and not repeated then
       show_briefing(level_choice)
-    elseif key == "right" and not repeated then
+    elseif key == "up" and not repeated then
       open_range()
     end
   elseif scene == "menu" then
@@ -110,7 +121,8 @@ local function navigate(key, repeated)
       elseif action == "drill" then
         if game.mission then missions_back = "menu" end
         retry()
-      elseif action == "missions" then show_missions("menu", game.mission and active_mission or 1)
+      elseif action == "missions" then
+        show_missions("menu", game.mission and active_mission or overworld:next_mission() or #levels)
       elseif action == "endless" then start_game("endless")
       elseif action == "range" then open_range()
       else sys.exit() end
@@ -142,7 +154,7 @@ function on_key(key, repeat_key)
   if key == "select" then
     if not repeated then
       if game.result == "won" and game.mission then
-        show_missions("range", active_mission % #levels + 1)
+        show_missions("range", overworld:next_mission() or active_mission)
       elseif game.result then
         if game.mission then missions_back = "range" end
         retry()
@@ -178,7 +190,7 @@ function on_tick(ms)
         unfinished = menu:draw_briefing(levels[briefing_choice], briefing_choice, menu_dirty == "rest")
         if indicators then indicators:clear() end
       elseif scene == "missions" then
-        menu:draw_missions(level_choice, levels)
+        overworld:draw(menu.canvas, level_choice)
         if indicators then indicators:clear() end
       elseif scene == "specs" then
         if enemy_guide then
@@ -211,7 +223,11 @@ function on_tick(ms)
     end
     if not next(resume_keys) then resume_keys = nil end
   end
+  local active = not game.result
   game:update(ms, keys)
+  if active and game.mission and game.result == "won" then
+    overworld:complete(active_mission)
+  end
   if indicators then indicators:update(game) end
   if game.dirty or screen:needs_pickup_frame(game) then
     screen:draw(game)
@@ -229,5 +245,6 @@ function range_status()
     #game.projectiles, #game.particles, scene, choice, page,
     (game.squad or game.practice) and game.drill or game.drill and "drill" or "range", game.health, game.result or "active",
     game.squad and game.squad.wave or 0, game.squad and game.squad.remaining or 0,
-    game.practice or "-", scene == "specs" and enemy_guide and enemy_page or 0
+    game.practice or "-", scene == "specs" and enemy_guide and enemy_page or 0,
+    scene == "missions" and level_choice or 0
 end
