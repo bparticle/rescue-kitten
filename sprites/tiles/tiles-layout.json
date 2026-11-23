@@ -1,0 +1,224 @@
+{
+  "image": "tileset.png",
+  "tileSize": 16,
+  "columns": 16,
+  "areaMasks": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    19,
+    38,
+    23,
+    39,
+    55,
+    137,
+    27,
+    139,
+    155,
+    76,
+    77,
+    141,
+    205,
+    46,
+    78,
+    110,
+    31,
+    47,
+    63,
+    79,
+    95,
+    111,
+    127,
+    143,
+    159,
+    175,
+    191,
+    207,
+    223,
+    239,
+    255
+  ],
+  "materials": {
+    "sand": {
+      "row": 0,
+      "variants": 47
+    },
+    "cobblestone": {
+      "row": 3,
+      "variants": 47
+    },
+    "road": {
+      "row": 6,
+      "variants": 47
+    },
+    "road-line": {
+      "row": 9,
+      "variants": 18
+    },
+    "wood-floor": {
+      "row": 11,
+      "variants": 4
+    },
+    "stone-floor": {
+      "row": 12,
+      "variants": 4
+    },
+    "tile-floor": {
+      "row": 13,
+      "variants": 4
+    },
+    "rug": {
+      "row": 14,
+      "variants": 47
+    },
+    "shallow-water": {
+      "row": 17,
+      "variants": 47
+    },
+    "deep-water": {
+      "row": 20,
+      "variants": 47
+    },
+    "stone-wall": {
+      "row": 23,
+      "variants": 16
+    },
+    "brick-wall": {
+      "row": 24,
+      "variants": 16
+    },
+    "wood-wall": {
+      "row": 25,
+      "variants": 16
+    },
+    "window": {
+      "row": 26,
+      "variants": 2
+    },
+    "doorway": {
+      "row": 27,
+      "variants": 2
+    },
+    "sandbags": {
+      "row": 28,
+      "variants": 16
+    },
+    "wood-fence": {
+      "row": 29,
+      "variants": 16
+    },
+    "hedge": {
+      "row": 30,
+      "variants": 16
+    },
+    "crate": {
+      "row": 31,
+      "variants": 4
+    },
+    "barrel": {
+      "row": 32,
+      "variants": 4
+    },
+    "rock": {
+      "row": 33,
+      "variants": 4
+    },
+    "tree": {
+      "row": 34,
+      "variants": 4
+    },
+    "bush": {
+      "row": 35,
+      "variants": 4
+    },
+    "barbed-wire": {
+      "row": 36,
+      "variants": 1
+    },
+    "fire-pit": {
+      "row": 37,
+      "variants": 4
+    },
+    "rubble": {
+      "row": 38,
+      "variants": 4
+    },
+    "splinters": {
+      "row": 39,
+      "variants": 4
+    },
+    "scorch": {
+      "row": 40,
+      "variants": 4
+    },
+    "roof-red": {
+      "row": 41,
+      "variants": 47
+    },
+    "roof-slate": {
+      "row": 44,
+      "variants": 47
+    },
+    "roof-thatch": {
+      "row": 47,
+      "variants": 47
+    },
+    "roof-tin": {
+      "row": 50,
+      "variants": 47
+    },
+    "roof-skylight": {
+      "row": 53,
+      "variants": 1
+    },
+    "roof-vent": {
+      "row": 54,
+      "variants": 1
+    },
+    "roof-ridge-ew": {
+      "row": 55,
+      "variants": 1
+    },
+    "roof-ridge-ns": {
+      "row": 56,
+      "variants": 1
+    },
+    "road-worn": {
+      "row": 57,
+      "variants": 47
+    },
+    "gravel": {
+      "row": 60,
+      "variants": 47
+    },
+    "bridge-planks": {
+      "row": 63,
+      "variants": 4
+    },
+    "metal-wall": {
+      "row": 64,
+      "variants": 16
+    },
+    "planter": {
+      "row": 65,
+      "variants": 2
+    },
+    "barbed-wire-ns": {
+      "row": 66,
+      "variants": 1
+    }
+  }
+}

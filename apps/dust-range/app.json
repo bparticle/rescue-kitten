@@ -1,0 +1,10 @@
+{
+  "id": "dust-range",
+  "name": "Dust Range",
+  "version": "0.19.0",
+  "summary": "Test weapons, fight through tile levels and unlock Endless Run in Squad Trial.",
+  "icon": "gps",
+  "accent": "D7BC78",
+  "category": "games",
+  "permissions": ["led"]
+}

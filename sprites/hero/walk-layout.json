@@ -1,0 +1,61 @@
+{
+  "frameWidth": 28,
+  "frameHeight": 28,
+  "pivot": {
+    "x": 14,
+    "y": 14
+  },
+  "framesPerSecond": 12,
+  "framesPerDirection": 8,
+  "directionRowsTopToBottom": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+  ],
+  "frameOrder": "left-to-right",
+  "loop": true,
+  "idleSheet": {
+    "image": "idle-hero.png",
+    "columnsLeftToRight": [
+      "unarmed",
+      "assault-rifle",
+      "handgun",
+      "grenade",
+      "rocket-launcher",
+      "flamethrower",
+      "pump-shotgun",
+      "tnt",
+      "rail-rifle",
+      "arc-projector",
+      "cryo-sprayer",
+      "charge-cannon",
+      "bankshot",
+      "boomerang-disc",
+      "gravity-orb",
+      "shock-hammer"
+    ]
+  },
+  "sheets": {
+    "unarmed": "walk-unarmed.png",
+    "assault-rifle": "walk-assault-rifle.png",
+    "handgun": "walk-handgun.png",
+    "grenade": "walk-grenade.png",
+    "rocket-launcher": "walk-rocket-launcher.png",
+    "flamethrower": "walk-flamethrower.png",
+    "pump-shotgun": "walk-pump-shotgun.png",
+    "tnt": "walk-tnt.png",
+    "rail-rifle": "walk-rail-rifle.png",
+    "arc-projector": "walk-arc-projector.png",
+    "cryo-sprayer": "walk-cryo-sprayer.png",
+    "charge-cannon": "walk-charge-cannon.png",
+    "bankshot": "walk-bankshot.png",
+    "boomerang-disc": "walk-boomerang-disc.png",
+    "gravity-orb": "walk-gravity-orb.png",
+    "shock-hammer": "walk-shock-hammer.png"
+  }
+}

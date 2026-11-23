@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dust Range Level Builder</title>
+<link rel="stylesheet" href="/editor.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">DUST RANGE <span>LEVEL BUILDER</span></div>
+  <select id="level-select" title="Open a saved level"></select>
+  <button id="btn-new" title="New level">New</button>
+  <button id="btn-save" title="Save the level source (Ctrl+S)">Save</button>
+  <button id="btn-export" class="primary" title="Save, validate and write the badge level">Export to badge</button>
+  <button id="btn-package" title="Run tools/package.py to rebuild dist/dust-range.zip">Build ZIP</button>
+  <span class="spacer"></span>
+  <button id="btn-undo" title="Undo (Ctrl+Z)">Undo</button>
+  <button id="btn-redo" title="Redo (Ctrl+Y)">Redo</button>
+  <span id="status" class="status"></span>
+</header>
+
+<main class="layout">
+  <aside class="sidebar left">
+    <section>
+      <h2>Tools</h2>
+      <div class="tools" id="tools"></div>
+      <div class="row" id="brush-row">
+        <label>Brush</label>
+        <div class="seg" id="brush-size">
+          <button data-size="1" class="on">1</button><button data-size="2">2</button><button data-size="3">3</button>
+        </div>
+      </div>
+      <div id="house-options" class="house hidden">
+        <label>Walls <select id="house-wall"></select></label>
+        <label>Floor <select id="house-floor"></select></label>
+        <label>Roof <select id="house-roof"></select></label>
+        <label class="check"><input type="checkbox" id="house-windows" checked> Wall openings on long sides</label>
+        <p class="hint">Drag a rectangle (3x3 or larger). A doorway goes in the middle of the south wall.</p>
+      </div>
+    </section>
+    <section class="palette-section">
+      <h2>Tiles <span class="layer-pill" id="layer-pill">ground</span></h2>
+      <div id="palette" class="palette"></div>
+    </section>
+  </aside>
+
+  <section class="stage" id="stage">
+    <canvas id="view"></canvas>
+    <div class="stage-hud">
+      <div class="seg" id="overlay-mode" title="Collision overlay (O)">
+        <button data-mode="none" class="on">Art</button>
+        <button data-mode="walk">Movement</button>
+        <button data-mode="shots">Gunfire</button>
+        <button data-mode="lobs">Throws</button>
+        <button data-mode="sight">Sight</button>
+        <button data-mode="hp">Destructible</button>
+        <button data-mode="roof">Rooftop</button>
+      </div>
+      <div class="seg" id="roof-mode" title="Roofs (T)">
+        <button data-mode="show" class="on">Roofs</button>
+        <button data-mode="ghost">Ghost</button>
+        <button data-mode="hide">Hidden</button>
+      </div>
+      <label class="check"><input type="checkbox" id="opt-grid" checked> Grid</label>
+      <label class="check"><input type="checkbox" id="opt-frame"> Badge screen</label>
+      <span class="zoom" id="zoom-label"></span>
+    </div>
+    <div class="statusbar" id="cell-info">Hover the map to inspect a cell.</div>
+  </section>
+
+  <aside class="sidebar right">
+    <section>
+      <h2>Selected tile</h2>
+      <div id="tile-info" class="tile-info"></div>
+    </section>
+    <section>
+      <h2>Entities</h2>
+      <div class="entity-buttons" id="entity-buttons">
+        <button data-type="spawn">Player spawn</button>
+        <button data-type="enemy" class="on">Enemy</button>
+        <button data-type="pickup">Weapon</button>
+        <button data-type="medkit">Medkit</button>
+        <button data-type="exit">Exit</button>
+      </div>
+      <div class="form" id="entity-form">
+        <label data-for="enemy">Kind <select id="ent-kind"></select></label>
+        <label data-for="enemy">Wave <input id="ent-wave" type="number" min="1" max="9" value="1"></label>
+        <label data-for="enemy">Surface <select id="ent-surface"><option value="ground">Ground</option><option value="roof">Rooftop</option></select></label>
+        <label data-for="enemy spawn">Facing <select id="ent-dir"></select></label>
+        <label data-for="pickup">Weapon <select id="ent-weapon"></select></label>
+      </div>
+      <p class="hint" id="entity-hint">Pick the Entities tool (N), then click to place. Click an entity to select and drag it, Delete to remove.</p>
+    </section>
+    <section>
+      <h2>Level</h2>
+      <div class="form">
+        <label>Name <input id="lvl-name" maxlength="26"></label>
+        <label>Id <input id="lvl-id" maxlength="40" pattern="[a-z0-9_-]+"></label>
+        <label>Objective <select id="lvl-objective"></select></label>
+        <label>Player HP <input id="lvl-health" type="number" min="10" max="999"></label>
+        <label>Menu order <input id="lvl-order" type="number"></label>
+        <div class="size-row">
+          <label>W <input id="lvl-w" type="number"></label>
+          <label>H <input id="lvl-h" type="number"></label>
+          <label>Shift X <input id="lvl-ax" type="number" value="0" title="Tiles to add on the west side"></label>
+          <label>Shift Y <input id="lvl-ay" type="number" value="0" title="Tiles to add on the north side"></label>
+          <button id="btn-resize">Resize</button>
+        </div>
+        <div class="size-row">
+          <label>Seed <input id="lvl-seed" type="number"></label>
+          <button id="btn-terrain" title="Re-roll every dirt, grass and mud cell with the game's terrain generator">Regenerate terrain</button>
+        </div>
+        <div class="loadout"><span>Starting loadout</span><div id="lvl-loadout"></div></div>
+      </div>
+    </section>
+    <section>
+      <h2>Checks <span id="issue-count" class="count"></span></h2>
+      <ul id="issues" class="issues"></ul>
+    </section>
+  </aside>
+</main>
+
+<dialog id="dialog"><form method="dialog"><pre id="dialog-text"></pre><button>Close</button></form></dialog>
+<script type="module" src="/editor.js"></script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+{
+  "image": "barren-terrain.png",
+  "tileWidth": 16,
+  "tileHeight": 16,
+  "columns": 4,
+  "rows": 3,
+  "margin": 0,
+  "spacing": 0,
+  "rotationsDegrees": [
+    0,
+    90,
+    180,
+    270
+  ],
+  "tiles": [
+    {
+      "id": 0,
+      "name": "wind-packed-dirt",
+      "material": "dirt",
+      "column": 0,
+      "row": 0,
+      "weightWithinMaterial": 56
+    },
+    {
+      "id": 1,
+      "name": "loose-gravel",
+      "material": "dirt",
+      "column": 1,
+      "row": 0,
+      "weightWithinMaterial": 18
+    },
+    {
+      "id": 2,
+      "name": "cracked-clay",
+      "material": "dirt",
+      "column": 2,
+      "row": 0,
+      "weightWithinMaterial": 14
+    },
+    {
+      "id": 3,
+      "name": "dust-scuffs",
+      "material": "dirt",
+      "column": 3,
+      "row": 0,
+      "weightWithinMaterial": 12
+    },
+    {
+      "id": 4,
+      "name": "scrub-sprigs",
+      "material": "grass",
+      "column": 0,
+      "row": 1,
+      "weightWithinMaterial": 34
+    },
+    {
+      "id": 5,
+      "name": "low-grass-mat",
+      "material": "grass",
+      "column": 1,
+      "row": 1,
+      "weightWithinMaterial": 24
+    },
+    {
+      "id": 6,
+      "name": "dry-tussocks",
+      "material": "grass",
+      "column": 2,
+      "row": 1,
+      "weightWithinMaterial": 25
+    },
+    {
+      "id": 7,
+      "name": "moss-and-chips",
+      "material": "grass",
+      "column": 3,
+      "row": 1,
+      "weightWithinMaterial": 17
+    },
+    {
+      "id": 8,
+      "name": "damp-silt",
+      "material": "mud",
+      "column": 0,
+      "row": 2,
+      "weightWithinMaterial": 38
+    },
+    {
+      "id": 9,
+      "name": "shallow-puddle",
+      "material": "mud",
+      "column": 1,
+      "row": 2,
+      "weightWithinMaterial": 23
+    },
+    {
+      "id": 10,
+      "name": "mud-ruts",
+      "material": "mud",
+      "column": 2,
+      "row": 2,
+      "weightWithinMaterial": 23
+    },
+    {
+      "id": 11,
+      "name": "drying-mud",
+      "material": "mud",
+      "column": 3,
+      "row": 2,
+      "weightWithinMaterial": 16
+    }
+  ]
+}

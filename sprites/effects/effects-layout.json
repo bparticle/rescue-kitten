@@ -1,0 +1,633 @@
+{
+  "note": "Native pixels. Pivot is the frame centre. Directional sheets have one row per facing, top to bottom: N, NE, E, SE, S, SW, W, NW. Frames run left to right.",
+  "effects": [
+    {
+      "weapon": "rail-rifle",
+      "name": "rail-muzzle",
+      "use": "fire",
+      "image": "rail-rifle/rail-muzzle.png",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 4,
+      "rows": 8,
+      "framesPerSecond": 30,
+      "pivot": {
+        "x": 8,
+        "y": 8
+      },
+      "directional": true,
+      "notes": "Muzzle flare at the rail tip.",
+      "playback": "once"
+    },
+    {
+      "weapon": "rail-rifle",
+      "name": "rail-beam",
+      "use": "travel",
+      "image": "rail-rifle/rail-beam.png",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 4,
+      "rows": 8,
+      "framesPerSecond": 24,
+      "pivot": {
+        "x": 8,
+        "y": 8
+      },
+      "directional": true,
+      "notes": "Tile repeated every tileStep along the beam, edge to edge. Frames fade the beam.",
+      "playback": "once",
+      "tileStep": {
+        "N": [
+          0,
+          -16
+        ],
+        "NE": [
+          16,
+          -16
+        ],
+        "E": [
+          16,
+          0
+        ],
+        "SE": [
+          16,
+          16
+        ],
+        "S": [
+          0,
+          16
+        ],
+        "SW": [
+          -16,
+          16
+        ],
+        "W": [
+          -16,
+          0
+        ],
+        "NW": [
+          -16,
+          -16
+        ]
+      }
+    },
+    {
+      "weapon": "rail-rifle",
+      "name": "rail-pierce",
+      "use": "impact",
+      "image": "rail-rifle/rail-pierce.png",
+      "frameWidth": 24,
+      "frameHeight": 24,
+      "frames": 5,
+      "rows": 8,
+      "framesPerSecond": 24,
+      "pivot": {
+        "x": 12,
+        "y": 12
+      },
+      "directional": true,
+      "notes": "Play on every target the slug passes through. The exit spray follows the shot.",
+      "playback": "once"
+    },
+    {
+      "weapon": "bankshot",
+      "name": "bank-muzzle",
+      "use": "fire",
+      "image": "bankshot/bank-muzzle.png",
+      "frameWidth": 12,
+      "frameHeight": 12,
+      "frames": 3,
+      "rows": 8,
+      "framesPerSecond": 30,
+      "pivot": {
+        "x": 6,
+        "y": 6
+      },
+      "directional": true,
+      "notes": "Pistol flash.",
+      "playback": "once"
+    },
+    {
+      "weapon": "bankshot",
+      "name": "bank-round",
+      "use": "travel",
+      "image": "bankshot/bank-round.png",
+      "frameWidth": 10,
+      "frameHeight": 10,
+      "frames": 2,
+      "rows": 8,
+      "framesPerSecond": 20,
+      "pivot": {
+        "x": 5,
+        "y": 5
+      },
+      "directional": true,
+      "notes": "Round in flight. Switch rows to the new heading after the bounce.",
+      "playback": "loop"
+    },
+    {
+      "weapon": "bankshot",
+      "name": "bank-ricochet",
+      "use": "bounce",
+      "image": "bankshot/bank-ricochet.png",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 5,
+      "rows": 1,
+      "framesPerSecond": 24,
+      "pivot": {
+        "x": 8,
+        "y": 8
+      },
+      "directional": false,
+      "notes": "Spark at the bounce point on the reflector face.",
+      "playback": "once"
+    },
+    {
+      "weapon": "bankshot",
+      "name": "reflector",
+      "use": "prop",
+      "image": "bankshot/reflector.png",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 3,
+      "rows": 2,
+      "framesPerSecond": 12,
+      "pivot": {
+        "x": 8,
+        "y": 8
+      },
+      "directional": false,
+      "notes": "Range prop. Row 1 is the \"/\" plate, row 2 the \"\\\" plate. Frame 1 idle, 2 struck, 3 cooling.",
+      "playback": "once"
+    },
+    {
+      "weapon": "bankshot",
+      "name": "bank-impact",
+      "use": "impact",
+      "image": "bankshot/bank-impact.png",
+      "frameWidth": 12,
+      "frameHeight": 12,
+      "frames": 4,
+      "rows": 1,
+      "framesPerSecond": 24,
+      "pivot": {
+        "x": 6,
+        "y": 6
+      },
+      "directional": false,
+      "notes": "Hit spark on the target.",
+      "playback": "once"
+    },
+    {
+      "weapon": "boomerang-disc",
+      "name": "disc-throw",
+      "use": "fire",
+      "image": "boomerang-disc/disc-throw.png",
+      "frameWidth": 18,
+      "frameHeight": 18,
+      "frames": 3,
+      "rows": 8,
+      "framesPerSecond": 24,
+      "pivot": {
+        "x": 9,
+        "y": 9
+      },
+      "directional": true,
+      "notes": "Throw swoosh in front of the hero.",
+      "playback": "once"
+    },
+    {
+      "weapon": "boomerang-disc",
+      "name": "disc-spin",
+      "use": "travel",
+      "image": "boomerang-disc/disc-spin.png",
+      "frameWidth": 11,
+      "frameHeight": 11,
+      "frames": 4,
+      "rows": 1,
+      "framesPerSecond": 20,
+      "pivot": {
+        "x": 5,
+        "y": 5
+      },
+      "directional": false,
+      "notes": "Disc in flight, out and back.",
+      "playback": "loop"
+    },
+    {
+      "weapon": "boomerang-disc",
+      "name": "disc-hit",
+      "use": "impact",
+      "image": "boomerang-disc/disc-hit.png",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 4,
+      "rows": 1,
+      "framesPerSecond": 24,
+      "pivot": {
+        "x": 8,
+        "y": 8
+      },
+      "directional": false,
+      "notes": "Slash spark. Plays on the outward hit and again on the return hit.",
+      "playback": "once"
+    },
+    {
+      "weapon": "boomerang-disc",
+      "name": "disc-catch",
+      "use": "return",
+      "image": "boomerang-disc/disc-catch.png",
+      "frameWidth": 12,
+      "frameHeight": 12,
+      "frames": 3,
+      "rows": 1,
+      "framesPerSecond": 20,
+      "pivot": {
+        "x": 6,
+        "y": 6
+      },
+      "directional": false,
+      "notes": "Catch glint at the hero.",
+      "playback": "once"
+    },
+    {
+      "weapon": "arc-projector",
+      "name": "arc-muzzle",
+      "use": "fire",
+      "image": "arc-projector/arc-muzzle.png",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 3,
+      "rows": 8,
+      "framesPerSecond": 30,
+      "pivot": {
+        "x": 8,
+        "y": 8
+      },
+      "directional": true,
+      "notes": "Forked crackle at the emitter.",
+      "playback": "once"
+    },
+    {
+      "weapon": "arc-projector",
+      "name": "arc-bolt",
+      "use": "travel",
+      "image": "arc-projector/arc-bolt.png",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 3,
+      "rows": 8,
+      "framesPerSecond": 20,
+      "pivot": {
+        "x": 8,
+        "y": 8
+      },
+      "directional": true,
+      "notes": "Jagged tile repeated every tileStep along the bolt and each chain link. Cycle frames.",
+      "playback": "loop",
+      "tileStep": {
+        "N": [
+          0,
+          -16
+        ],
+        "NE": [
+          16,
+          -16
+        ],
+        "E": [
+          16,
+          0
+        ],
+        "SE": [
+          16,
+          16
+        ],
+        "S": [
+          0,
+          16
+        ],
+        "SW": [
+          -16,
+          16
+        ],
+        "W": [
+          -16,
+          0
+        ],
+        "NW": [
+          -16,
+          -16
+        ]
+      }
+    },
+    {
+      "weapon": "arc-projector",
+      "name": "arc-zap",
+      "use": "impact",
+      "image": "arc-projector/arc-zap.png",
+      "frameWidth": 20,
+      "frameHeight": 20,
+      "frames": 4,
+      "rows": 1,
+      "framesPerSecond": 24,
+      "pivot": {
+        "x": 10,
+        "y": 10
+      },
+      "directional": false,
+      "notes": "Zap on the first and each chained target.",
+      "playback": "once"
+    },
+    {
+      "weapon": "cryo-sprayer",
+      "name": "cryo-muzzle",
+      "use": "fire",
+      "image": "cryo-sprayer/cryo-muzzle.png",
+      "frameWidth": 12,
+      "frameHeight": 12,
+      "frames": 3,
+      "rows": 8,
+      "framesPerSecond": 30,
+      "pivot": {
+        "x": 6,
+        "y": 6
+      },
+      "directional": true,
+      "notes": "Frost burst at the nozzle.",
+      "playback": "once"
+    },
+    {
+      "weapon": "cryo-sprayer",
+      "name": "cryo-puff",
+      "use": "travel",
+      "image": "cryo-sprayer/cryo-puff.png",
+      "frameWidth": 9,
+      "frameHeight": 7,
+      "frames": 3,
+      "rows": 3,
+      "framesPerSecond": 54,
+      "pivot": {
+        "x": 4,
+        "y": 3
+      },
+      "directional": false,
+      "notes": "Spray puffs, like the flame tongues. Row = age (fresh, drifting, fading), column = flicker.",
+      "playback": "loop"
+    },
+    {
+      "weapon": "cryo-sprayer",
+      "name": "frost-coat",
+      "use": "status",
+      "image": "cryo-sprayer/frost-coat.png",
+      "frameWidth": 22,
+      "frameHeight": 18,
+      "frames": 4,
+      "rows": 1,
+      "framesPerSecond": 8,
+      "pivot": {
+        "x": 11,
+        "y": 9
+      },
+      "directional": false,
+      "notes": "Overlay on a frosted target. Frames 1-2 coat it, then loop frames 3-4.",
+      "playback": "loop",
+      "loopFromFrame": 3
+    },
+    {
+      "weapon": "cryo-sprayer",
+      "name": "frost-shatter",
+      "use": "impact",
+      "image": "cryo-sprayer/frost-shatter.png",
+      "frameWidth": 26,
+      "frameHeight": 26,
+      "frames": 6,
+      "rows": 1,
+      "framesPerSecond": 24,
+      "pivot": {
+        "x": 13,
+        "y": 13
+      },
+      "directional": false,
+      "notes": "A follow-up hit on a frosted target shatters the coat.",
+      "playback": "once"
+    },
+    {
+      "weapon": "charge-cannon",
+      "name": "charge-orb",
+      "use": "charge",
+      "image": "charge-cannon/charge-orb.png",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 6,
+      "rows": 1,
+      "framesPerSecond": 12,
+      "pivot": {
+        "x": 8,
+        "y": 8
+      },
+      "directional": false,
+      "notes": "At the muzzle while Select is held. Frames 1-4 build, then loop frames 5-6 at full charge.",
+      "playback": "loop",
+      "loopFromFrame": 5
+    },
+    {
+      "weapon": "charge-cannon",
+      "name": "charge-release",
+      "use": "fire",
+      "image": "charge-cannon/charge-release.png",
+      "frameWidth": 18,
+      "frameHeight": 18,
+      "frames": 3,
+      "rows": 8,
+      "framesPerSecond": 30,
+      "pivot": {
+        "x": 9,
+        "y": 9
+      },
+      "directional": true,
+      "notes": "Release flash.",
+      "playback": "once"
+    },
+    {
+      "weapon": "charge-cannon",
+      "name": "charge-bolt-low",
+      "use": "travel",
+      "image": "charge-cannon/charge-bolt-low.png",
+      "frameWidth": 14,
+      "frameHeight": 14,
+      "frames": 2,
+      "rows": 8,
+      "framesPerSecond": 20,
+      "pivot": {
+        "x": 7,
+        "y": 7
+      },
+      "directional": true,
+      "notes": "Bolt for a partial charge.",
+      "playback": "loop"
+    },
+    {
+      "weapon": "charge-cannon",
+      "name": "charge-bolt-full",
+      "use": "travel",
+      "image": "charge-cannon/charge-bolt-full.png",
+      "frameWidth": 22,
+      "frameHeight": 22,
+      "frames": 4,
+      "rows": 8,
+      "framesPerSecond": 20,
+      "pivot": {
+        "x": 11,
+        "y": 11
+      },
+      "directional": true,
+      "notes": "Bolt for a full charge.",
+      "playback": "loop"
+    },
+    {
+      "weapon": "charge-cannon",
+      "name": "charge-impact",
+      "use": "impact",
+      "image": "charge-cannon/charge-impact.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 6,
+      "rows": 1,
+      "framesPerSecond": 24,
+      "pivot": {
+        "x": 16,
+        "y": 16
+      },
+      "directional": false,
+      "notes": "Shockwave on hit.",
+      "playback": "once"
+    },
+    {
+      "weapon": "gravity-orb",
+      "name": "orb-launch",
+      "use": "fire",
+      "image": "gravity-orb/orb-launch.png",
+      "frameWidth": 14,
+      "frameHeight": 14,
+      "frames": 3,
+      "rows": 8,
+      "framesPerSecond": 24,
+      "pivot": {
+        "x": 7,
+        "y": 7
+      },
+      "directional": true,
+      "notes": "Launch ring.",
+      "playback": "once"
+    },
+    {
+      "weapon": "gravity-orb",
+      "name": "orb-shot",
+      "use": "travel",
+      "image": "gravity-orb/orb-shot.png",
+      "frameWidth": 12,
+      "frameHeight": 12,
+      "frames": 4,
+      "rows": 1,
+      "framesPerSecond": 16,
+      "pivot": {
+        "x": 6,
+        "y": 6
+      },
+      "directional": false,
+      "notes": "Orb in flight.",
+      "playback": "loop"
+    },
+    {
+      "weapon": "gravity-orb",
+      "name": "gravity-well",
+      "use": "field",
+      "image": "gravity-orb/gravity-well.png",
+      "frameWidth": 40,
+      "frameHeight": 40,
+      "frames": 6,
+      "rows": 1,
+      "framesPerSecond": 12,
+      "pivot": {
+        "x": 20,
+        "y": 20
+      },
+      "directional": false,
+      "notes": "Looping vortex while the orb pulls. The dotted ring marks a 17 px pull radius.",
+      "playback": "loop"
+    },
+    {
+      "weapon": "gravity-orb",
+      "name": "well-collapse",
+      "use": "impact",
+      "image": "gravity-orb/well-collapse.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 5,
+      "rows": 1,
+      "framesPerSecond": 20,
+      "pivot": {
+        "x": 16,
+        "y": 16
+      },
+      "directional": false,
+      "notes": "The well collapses and releases the clustered targets.",
+      "playback": "once"
+    },
+    {
+      "weapon": "shock-hammer",
+      "name": "hammer-swing",
+      "use": "fire",
+      "image": "shock-hammer/hammer-swing.png",
+      "frameWidth": 36,
+      "frameHeight": 36,
+      "frames": 4,
+      "rows": 8,
+      "framesPerSecond": 30,
+      "pivot": {
+        "x": 18,
+        "y": 18
+      },
+      "directional": true,
+      "notes": "Sweep smear centred on the hero pivot, reaching 10-14 px.",
+      "playback": "once"
+    },
+    {
+      "weapon": "shock-hammer",
+      "name": "hammer-shock",
+      "use": "impact",
+      "image": "shock-hammer/hammer-shock.png",
+      "frameWidth": 26,
+      "frameHeight": 26,
+      "frames": 5,
+      "rows": 1,
+      "framesPerSecond": 24,
+      "pivot": {
+        "x": 13,
+        "y": 13
+      },
+      "directional": false,
+      "notes": "Shock on each target in the arc.",
+      "playback": "once"
+    },
+    {
+      "weapon": "shock-hammer",
+      "name": "knock-skid",
+      "use": "knockback",
+      "image": "shock-hammer/knock-skid.png",
+      "frameWidth": 18,
+      "frameHeight": 18,
+      "frames": 3,
+      "rows": 8,
+      "framesPerSecond": 18,
+      "pivot": {
+        "x": 9,
+        "y": 9
+      },
+      "directional": true,
+      "notes": "Dust behind a knocked-back target. Facing = knockback direction.",
+      "playback": "once"
+    }
+  ]
+}
