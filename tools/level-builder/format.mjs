@@ -453,7 +453,7 @@ export function validate(level, materials) {
   for (const entity of level.entities) {
     const x = Math.round(entity.x), y = Math.round(entity.y);
     const cell = Number.isFinite(entity.x) && Number.isFinite(entity.y) ? cellOf(level, x, y) : -1;
-    const label = entity.type === 'enemy' ? `${entity.kind} (wave ${entity.wave || 1})`
+    const label = entity.type === 'enemy' ? `${entity.kind} (${entity.alarm ? 'alarm' : `wave ${entity.wave || 1}`})`
       : entity.type === 'pickup' ? `${WEAPONS[entity.weapon] || 'Unknown weapon'} pickup` : entity.type;
     if (!['spawn', 'enemy', 'pickup', 'medkit', 'hamburger', 'kitten', 'exit'].includes(entity.type)) {
       add('error', 'Unknown entity type.', entity);
@@ -469,6 +469,10 @@ export function validate(level, materials) {
         add('error', 'Enemy wave must be a whole number from 1 to 9.', entity);
       }
       if (entity.rooftop && enemy?.weapon === 0) add('error', `${enemy.name} needs a ground position to attack.`, entity);
+      if (entity.alarm !== undefined && typeof entity.alarm !== 'boolean') add('error', `${label} has an invalid arrival.`, entity);
+      if (entity.alarm && level.objective !== 'rescue-kitten') {
+        add('warn', `${label} arrives on the kitten alarm, but this level has no kitten to rescue.`, entity);
+      }
     }
     if (entity.rooftop !== undefined && (entity.type !== 'enemy' || typeof entity.rooftop !== 'boolean')) {
       add('error', `${label} has an invalid surface.`, entity);
@@ -528,7 +532,7 @@ function encodeLayer(level, layer, materials) {
 
 export function summary(level) {
   const enemies = level.entities.filter((e) => e.type === 'enemy');
-  const waves = new Set(enemies.map((e) => e.wave || 1));
+  const waves = new Set(enemies.filter((e) => !e.alarm).map((e) => e.wave || 1));
   return {
     id: level.id, name: level.name || level.id, w: level.width, h: level.height,
     objective: level.objective || 'clear', enemies: enemies.length, waves: Math.max(1, waves.size),
@@ -543,7 +547,8 @@ export function toLua(level, materials) {
   const entity = (e) => {
     const x = Math.round(e.x), y = Math.round(e.y);
     if (e.type === 'spawn') return `{"spawn",${x},${y},${(e.dir ?? 4) + 1}}`;
-    if (e.type === 'enemy') return `{"enemy",${luaString(e.kind)},${x},${y},${(e.dir ?? 4) + 1},${e.wave || 1}${e.rooftop ? ',true' : ''}}`;
+    // Wave 0 is the alarm squad, which arrives when the kitten is picked up.
+    if (e.type === 'enemy') return `{"enemy",${luaString(e.kind)},${x},${y},${(e.dir ?? 4) + 1},${e.alarm ? 0 : e.wave || 1}${e.rooftop ? ',true' : ''}}`;
     if (e.type === 'pickup') return `{"pickup",${e.weapon},${x},${y}}`;
     return `{${luaString(e.type)},${x},${y}}`;
   };

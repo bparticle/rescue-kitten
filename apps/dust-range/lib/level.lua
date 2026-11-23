@@ -160,7 +160,7 @@ end
 
 function Level.new(def)
   local w, h = def.w, def.h
-  local level = {def=def, w=w, h=h, records={}, flow={}, version=0, roof_height=ROOF_HEIGHT}
+  local level = {def=def, w=w, h=h, records={}, flow={}, version=0, roof_height=ROOF_HEIGHT, destroyed={}}
   local legend, widths = def.legend, def.cell or {}
   level.ground = decode_layer(level, def.ground, legend.ground, widths.ground or 1, w*h)
   level.structure = decode_layer(level, def.structure, legend.structure, widths.structure or 1, w*h)
@@ -570,6 +570,7 @@ function Level.destroy(level, i)
   if not tile then return end
   local def = tile.def
   local leftover = def.breaksTo
+  level.destroyed[#level.destroyed+1] = i
   level.structure[i] = leftover
     and record(level, leftover .. "/" .. texture_variant(level, i, tiles.materials[leftover])) or nil
   level.hp[i] = leftover and tiles.materials[leftover].hp or nil

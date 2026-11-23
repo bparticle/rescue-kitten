@@ -159,9 +159,11 @@ lua(`
   Game = require("lib.game")
   Level = require("lib.level")
   View = require("lib.view")
-  function fresh(id)
-    local game = Game.new(427, "level", nil, id or "outpost")
+  -- Unit checks run without hitstop so short fixed runs aren't paused; one check covers it.
+  function fresh(id, checkpoint)
+    local game = Game.new(427, "level", nil, id or "outpost", nil, checkpoint)
     while game.survey do game:prepare() end
+    game.freeze = nil
     return game
   end
   function run(game, ms, keys)
@@ -651,13 +653,126 @@ check('results show stars and a new best', `
   return "drawn"
 `, 'drawn');
 
+check('picking up the kitten wakes the guards and brings in the alarm squad', `
+  local g = fresh("farmhouse")
+  local dormant = 0
+  for _, e in ipairs(g.enemies) do if e.dormant then dormant = dormant + 1 end end
+  local before = #g.enemies
+  assert(dormant > 0 and #g.mission.alarm == 2)
+  g.x, g.y = g.mission.kitten.x, g.mission.kitten.y
+  run(g, 16)
+  assert(g.mission.carrying and g.notice == "KITTEN FOUND  GUARDS ALERTED")
+  assert(#g.enemies == before + 2, "the alarm squad arrives")
+  for _, e in ipairs(g.enemies) do assert(not e.dormant and e.alerted) end
+  run(g, 16)
+  assert(#g.enemies == before + 2, "the alarm only sounds once")
+  local quiet = fresh("backyard")
+  for _, e in ipairs(quiet.enemies) do e.health = 0 end
+  run(quiet, 16)
+  quiet.x, quiet.y = quiet.mission.kitten.x, quiet.mission.kitten.y
+  run(quiet, 16)
+  return quiet.notice
+`, 'KITTEN FOUND  REACH THE EXIT');
+
+check('carrying the kitten slows the player', `
+  local g = fresh("backyard")
+  for _, e in ipairs(g.enemies) do e.health = 0 end
+  local x = g.x
+  run(g, 160, {down=true})
+  local free = g.y - 72
+  g.mission.carrying = true
+  g.x, g.y = x, 72
+  run(g, 160, {down=true})
+  local carried = g.y - 72
+  return string.format("%.2f", carried / free)
+`, '0.85');
+
+check('a defeat after a later wave resumes from that wave with the state it had', `
+  local g = fresh("riverside")
+  for _, e in ipairs(g.enemies) do e.health = 0 end
+  local Level = require("lib.level")
+  local crate
+  for i = 1, g.level.w*g.level.h do if g.level.hp[i] then crate = i break end end
+  Level.destroy(g.level, crate)
+  local medkit
+  for index, item in ipairs(g.pickups) do if item.kind == "medkit" or item.kind == "hamburger" then medkit = index item.collected = true break end end
+  g.health, g.score, g.damage_taken = 61, 340, 49
+  run(g, 1800)
+  assert(g.squad.wave == 2 and g.checkpoint and g.checkpoint.wave == 2)
+  local cp, waiting = g.checkpoint, #g.enemies
+  g.health = 0
+  run(g, 16)
+  assert(g.result == "lost")
+  local r = fresh("riverside", cp)
+  assert(r.squad.wave == 2 and #r.enemies == waiting, "only the checkpoint wave is on the field")
+  for _, e in ipairs(r.enemies) do assert(e.alerted and not e.dormant) end
+  assert(r.x == cp.x and r.y == cp.y and r.health == 61 and r.score == 340 and r.damage_taken == 49)
+  assert(r.time == cp.time and r.level.structure[crate] ~= fresh("riverside").level.structure[crate])
+  assert(not medkit or r.pickups[medkit].collected)
+  assert(r.notice == "CHECKPOINT  WAVE 2")
+  return "ok"
+`, 'ok');
+
+check('a kill holds the action for a moment, and quick kills build a streak', `
+  local g = Game.new(427, "level", nil, "farmhouse")
+  while g.survey do g:prepare() end
+  local a, b, c = g.enemies[1], g.enemies[2], g.enemies[3]
+  g:damage(a, 999, "impact")
+  assert(g.freeze == 0.06 and g.score == 100 and g.popups[1].label == "+100")
+  local t = g.time
+  g:update(16, {}); g:update(16, {}); g:update(16, {})
+  assert(g.time == t, "the clock waits during hitstop")
+  g:update(16, {}); g:update(16, {})
+  assert(g.time > t and g.freeze == 0)
+  g:damage(b, 999, "impact")
+  assert(g.score == 300 and g.popups[2].label == "+200 X2")
+  g.score_boost = 10
+  g:damage(c, 999, "impact")
+  assert(g.score == 900 and g.popups[3].label == "+600 X3", "the hamburger doubles the streak bonus")
+  g.time = g.time + 3
+  g.score_boost = nil
+  g:damage(g.enemies[4], 999, "impact")
+  assert(g.streak == 1 and g.score == 1000, "a pause breaks the streak")
+  for _ = 1, 50 do g:update(16, {}) end
+  return #g.popups
+`, 0);
+
+check('a double-tapped dash covers ground, dodges hits and has a cooldown', `
+  local g = fresh("backyard")
+  for _, e in ipairs(g.enemies) do e.health = 0 end
+  local x = g.x
+  assert(g:request_dodge("right"))
+  run(g, 16)
+  assert(not g:request_dodge("right"), "the dash has a cooldown")
+  g:enemy_hit(30, "impact")
+  assert(g.health == g.surface.health and g.notice == "DODGED")
+  run(g, 160)
+  local dashed = g.x - x
+  assert(dashed > 45 and dashed < 60, "dash distance " .. dashed)
+  g:enemy_hit(10, "impact")
+  assert(g.health == g.surface.health - 10, "the dash ends")
+  run(g, 600)
+  local y = g.y
+  assert(g:request_dodge("left"))
+  run(g, 48, {down=true})
+  assert(g.y > y + 10 and g.x == x + dashed, "held keys angle the dash")
+  return "ok"
+`, 'ok');
+
 // The map opens first, only Backyard is open, then rescue, extraction, and the next mission.
 const status = () => lua('return table.concat({range_status()}, ",")').split(',');
 const position = () => status().slice(0, 2).map(Number);
 const walk = async (key, target) => {
   const axis = key === 'left' || key === 'right' ? 0 : 1;
   const sign = key === 'left' || key === 'up' ? -1 : 1;
-  for (let i = 0; i < 200 && sign * (target - position()[axis]) > 1; i++) await badge.hold(key, 1);
+  // Hold for most of the way (at most 1.7 px per 16 ms tick), then nudge with
+  // single taps spaced beyond the double-tap window so they never start a dash.
+  const bulk = Math.floor((sign * (target - position()[axis]) - 2) / 1.7);
+  if (bulk > 0) await badge.hold(key, bulk);
+  for (let i = 0; i < 40 && sign * (target - position()[axis]) > 1; i++) {
+    await badge.frames(18);
+    await badge.hold(key, 1);
+  }
   assert.ok(Math.abs(target - position()[axis]) < 2, `${key} to ${target}: ${position()}`);
 };
 await badge.frames(2);
@@ -716,6 +831,12 @@ await walk('right', 88);
 await walk('down', 168);
 assert.equal(status()[2], '2', 'walking over the assault rifle equips it');
 assert.deepEqual(JSON.parse(badge.storageJson()).arsenal, [2], 'the picked-up rifle is saved at once');
+{
+  const [x0] = position();
+  await badge.press('left', { after: 0 });
+  await badge.press('left', { after: 12 });
+  assert.ok(position()[0] < x0 - 40, `two quick presses dash: ${x0} -> ${position()[0]}`);
+}
 console.log('ok  game opens on the map, Backyard unlocks Orchard, and found weapons are saved');
 
 // Follow the route in either direction, and leave for the range with Up.

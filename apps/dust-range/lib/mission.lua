@@ -3,7 +3,8 @@ local Mission = {}
 local BETWEEN_WAVES, WAKE_CALL, INTERACT_RADIUS = 1.6, 64, 10
 local RESCUE_POINTS, TIME_BONUS_MAX, TIME_BONUS_PER_SECOND = 500, 600, 10
 
-function Mission.start(game, id)
+-- checkpoint: a snapshot taken when a later wave arrived (see Mission.snapshot), or nil.
+function Mission.start(game, id, checkpoint)
   local Level = require("lib.level")
   local def = require("levels." .. id)
   local level = Level.new(def)
@@ -24,7 +25,7 @@ function Mission.start(game, id)
   game.weapon = (def.loadout or {})[1] or next(game.owned) or 0
   if not next(game.owned) then game.owned[0] = true end
 
-  local mission = {waves={}, name=def.name, objective=def.objective or "clear", par=def.par}
+  local mission = {waves={}, alarm={}, name=def.name, objective=def.objective or "clear", par=def.par}
   game.mission = mission
   local total = 0
   for _, entity in ipairs(def.entities or {}) do
@@ -33,9 +34,14 @@ function Mission.start(game, id)
       game.x, game.y, game.direction = entity[2], entity[3], entity[4] or 5
     elseif kind == "enemy" then
       local wave = entity[6] or 1
-      mission.waves[wave] = mission.waves[wave] or {}
-      table.insert(mission.waves[wave], entity)
-      total = math.max(total, wave)
+      if wave == 0 then
+        -- Wave 0 is the alarm squad: it moves in when the kitten is picked up.
+        mission.alarm[#mission.alarm+1] = entity
+      else
+        mission.waves[wave] = mission.waves[wave] or {}
+        table.insert(mission.waves[wave], entity)
+        total = math.max(total, wave)
+      end
     elseif kind == "pickup" then
       game.pickups[#game.pickups+1] = {id=entity[2], x=entity[3], y=entity[4]}
     elseif kind == "medkit" then
@@ -58,6 +64,7 @@ function Mission.start(game, id)
   end
   mission.waves = ordered
   game.squad = {wave=1, total=math.max(1, #ordered), remaining=0, next_attack_at=0, mission=true}
+  if checkpoint then return Mission.resume(game, checkpoint) end
   Mission.spawn_wave(game, 1)
   if mission.objective == "rescue-kitten" then game:message("WALK UP TO THE KITTEN")
   elseif mission.objective == "exit" then game:message("REACH THE EXIT")
@@ -73,6 +80,7 @@ function Mission.spawn_wave(game, wave)
     -- The opening wave holds position until it sees the player. Later waves arrive hunting.
     if wave == 1 then enemy.dormant = true else enemy.alerted = true end
   end
+  if wave > 1 then game.checkpoint = Mission.snapshot(game, wave) end
   if wave > 1 then game:message("WAVE " .. wave .. " INCOMING") end
 end
 
@@ -125,6 +133,54 @@ local function complete(game)
   return "won"
 end
 
+-- The kitten's cries wake every guard, and the alarm squad moves in. Returns true if anyone heard.
+function Mission.raise_alarm(game)
+  local mission, heard = game.mission, false
+  if mission.alarm_raised then return false end
+  mission.alarm_raised = true
+  for _, enemy in ipairs(game.enemies) do
+    if enemy.dormant then enemy.dormant, enemy.alerted, heard = nil, true, true end
+  end
+  for index, entity in ipairs(mission.alarm) do
+    local enemy = game:spawn_enemy(entity[2], entity[3], entity[4], entity[5] or 5, entity[7])
+    enemy.ready_at, enemy.alerted, heard = game.time + 0.6 + (index-1)*0.15, true, true
+  end
+  return heard
+end
+
+-- What a retry from this wave restores. Taken as the wave arrives, so earlier enemies are gone.
+function Mission.snapshot(game, wave)
+  local mission, owned, collected = game.mission, {}, {}
+  for id in pairs(game.owned) do owned[#owned+1] = id end
+  for index, item in ipairs(game.pickups) do
+    if item.collected then collected[#collected+1] = index end
+  end
+  local destroyed = {}
+  for index, cell in ipairs(game.level.destroyed) do destroyed[index] = cell end
+  return {
+    level=game.level_id, wave=wave, x=game.x, y=game.y, direction=game.direction,
+    health=game.health, weapon=game.weapon, owned=owned, collected=collected, destroyed=destroyed,
+    score=game.score, time=game.time, damage=game.damage_taken or 0,
+    carrying=mission.carrying, alarm=mission.alarm_raised,
+  }
+end
+
+function Mission.resume(game, checkpoint)
+  local Level, mission = require("lib.level"), game.mission
+  for _, cell in ipairs(checkpoint.destroyed) do Level.destroy(game.level, cell) end
+  for _, index in ipairs(checkpoint.collected) do game.pickups[index].collected = true end
+  game.owned = {}
+  for _, id in ipairs(checkpoint.owned) do game.owned[id] = true end
+  game.x, game.y, game.direction = checkpoint.x, checkpoint.y, checkpoint.direction
+  game.health, game.weapon = checkpoint.health, checkpoint.weapon
+  game.score, game.time, game.damage_taken = checkpoint.score, checkpoint.time, checkpoint.damage
+  mission.carrying, mission.alarm_raised = checkpoint.carrying, checkpoint.alarm
+  mission.exit_open = checkpoint.carrying
+  game.squad.wave = checkpoint.wave
+  Mission.spawn_wave(game, checkpoint.wave)
+  game:message("CHECKPOINT  WAVE " .. checkpoint.wave)
+end
+
 function Mission.update(game)
   local squad, mission = game.squad, game.mission
   for index = #game.enemies, 1, -1 do
@@ -146,7 +202,7 @@ function Mission.update(game)
   local rescue = mission.objective == "rescue-kitten"
   if rescue and mission.kitten and not mission.carrying and in_reach(game, mission.kitten) then
     mission.carrying, mission.exit_open = true, true
-    game:message("KITTEN FOUND  REACH THE EXIT")
+    game:message(Mission.raise_alarm(game) and "KITTEN FOUND  GUARDS ALERTED" or "KITTEN FOUND  REACH THE EXIT")
   end
 
   if game.exit and in_reach(game, game.exit) then

@@ -942,7 +942,7 @@ local function hud(c, game)
       right = right-6*#condition-(game.score and 7 or 0)
       text(c,condition,right,16,condition_color)
     end
-    local hint = (game.score or condition) and "D-PAD MOVE  SELECT FIRE"
+    local hint = (game.score or condition) and "SELECT FIRE  DOUBLE-TAP DASH"
       or "D-PAD MOVE  SELECT FIRE  CANCEL GEAR / HOLD MENU"
     local notice = game.notice or hint
     text(c,notice:sub(1,max(0,(right-13)//6)),7,16,game.notice and BRASS or DIM)
@@ -1051,6 +1051,16 @@ function View:draw(game)
       draw_particle(c,particle,left,top,game)
     end
   end
+  local popups = game.popups
+  if popups then
+    -- Score labels rise from a defeated enemy, white at first, then brass.
+    for _, popup in ipairs(popups) do
+      local age = game.time - popup.born
+      local x, y = round(popup.x)-left-3*#popup.label, round(popup.y-age*18)-top
+      text(c,popup.label,x+1,y+1,INK)
+      text(c,popup.label,x,y,age < 0.15 and STAR_NEW or BRASS)
+    end
+  end
   if game.charge_from then
     local weapon = Game.weapons[game.weapon]
     local mx, my = game:muzzle(weapon)
@@ -1118,7 +1128,8 @@ function View:draw(game)
     if game.result == "won" then
       result = rescue and "KITTEN SAFE" or mission and "MISSION CLEAR" or "PRACTICE CLEARED"
     end
-    local action = mission and game.result == "won" and "SELECT MISSIONS" or "SELECT RETRY"
+    local action = mission and game.result == "won" and "SELECT MISSIONS"
+      or game.checkpoint and "SELECT RETRY WAVE " .. game.checkpoint.wave or "SELECT RETRY"
     text(c,result,80-3*#result,y+7,BRASS)
     local line = y+18
     if game.score then

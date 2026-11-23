@@ -17,7 +17,7 @@ Each map region holds up to ten locations. Further exports continue the same rou
 | B / R / F / E | Paint, rectangle (Shift for an outline), flood fill, erase |
 | I or Alt+click | Pick the tile under the cursor |
 | H | House: walls, floor, roof, a south doorway and optional wall openings in one drag |
-| N | Entities: player spawn, enemies (kind, facing, wave, surface), weapon pickups, medkits, hamburgers, kitten, exit |
+| N | Entities: player spawn, enemies (kind, facing, wave, arrival, surface), weapon pickups, medkits, hamburgers, kitten, exit |
 | Space or right-drag, wheel | Pan and zoom |
 | 1 / 2 / 3, [ / ] | Ground, structure and roof layer, brush size |
 | O / T / G | Cycle collision overlay, roof display, grid |
@@ -40,7 +40,7 @@ Other tools:
 
 ## Kitten rescue missions
 
-Set **Objective** to **Rescue kitten and carry it to the exit**. Place one **Kitten** and one **Exit** with the Entities tool, then export the level. The player picks up the kitten by walking up to it and completes the mission at the exit. Enemy waves are optional. All ten bundled missions are rescues: open `backyard` for the simplest one.
+Set **Objective** to **Rescue kitten and carry it to the exit**. Place one **Kitten** and one **Exit** with the Entities tool, then export the level. The player picks up the kitten by walking up to it and completes the mission at the exit. Enemy waves are optional. Picking up the kitten wakes every guard. Set an enemy's **Arrives** to **On the kitten alarm** to hold it back until then: it spawns hunting, which makes the walk to the exit an escape. The editor marks these enemies with an A. All ten bundled missions are rescues: open `backyard` for the simplest one.
 
 The builder warns when the kitten **cannot be reached on foot**. Crate Yard and Cold Storage do this on purpose: crates and brick walls seal the kitten in, and the player breaks through. `levels-smoke.mjs` checks that destructible tiles open a way through in every bundled mission.
 
@@ -98,7 +98,7 @@ Every tile's behaviour comes from `sprites/tiles/materials.json`. The game, the 
 - [x] Three layers per cell: ground, structure, roof.
 - [x] Terrain brushes reuse the range's dirt, grass and mud tiles with random variants and rotations. **Regenerate terrain** runs the game's own terrain generator from a seed.
 - [x] Player spawn and facing, starting health and starting loadout.
-- [x] Enemies of all 12 kinds, with facing and wave number. The first wave holds position until it sees you or is hit. Later waves arrive hunting.
+- [x] Enemies of all 12 kinds, with facing and wave number. The first wave holds position until it sees you or is hit. Later waves arrive hunting, and each one is a checkpoint. Alarm enemies arrive when the kitten is picked up.
 - [x] Weapon pickups for all 15 weapons.
 - [x] Medkits that restore up to 30 HP when a wounded player walks over one.
 - [x] Objectives: clear every wave, reach the exit, clear then exit, or carry a kitten to the exit.

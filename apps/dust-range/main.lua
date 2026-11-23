@@ -12,7 +12,8 @@ local screen = View.new()
 screen.pickup_motion = not storage or storage.get("pickup_motion") ~= false
 local menu = Menu.new()
 local indicators = Indicators.new()
-local MENU_HOLD_MS = 1200
+local MENU_HOLD_MS, DOUBLE_TAP_MS = 1200, 260
+local last_tap_key, last_tap_at
 local scene, choice, page = "range", 1, 1
 local enemy_page, enemy_guide, specs_back = 1, false, "menu"
 local cancel_pressed_at, resume_keys, menu_dirty
@@ -39,9 +40,9 @@ local function resume_game()
   menu:close()
 end
 
-local function start_game(kind, id)
+local function start_game(kind, id, checkpoint)
   game = Game.new(SEED, kind, not range.survey and range.ground or nil, id,
-    kind == "level" and overworld.arsenal or nil)
+    kind == "level" and overworld.arsenal or nil, checkpoint)
   kept_found = game.found
   if game.survey then screen:loading() end
   resume_game()
@@ -157,6 +158,9 @@ function on_key(key, repeat_key)
     if not repeated then
       if game.result == "won" and game.mission then
         show_missions("range", overworld:next_mission() or active_mission)
+      elseif game.result and game.checkpoint then
+        -- A defeat after a later wave arrived restarts from that wave.
+        start_game("level", game.level_id, game.checkpoint)
       elseif game.result then
         if game.mission then missions_back = "range" end
         retry()
@@ -172,7 +176,19 @@ function on_key(key, repeat_key)
     end
     return true
   end
-  return key == "up" or key == "down" or key == "left" or key == "right"
+  if key == "up" or key == "down" or key == "left" or key == "right" then
+    if not repeated then
+      local now = sys.millis()
+      if last_tap_key == key and now - last_tap_at <= DOUBLE_TAP_MS then
+        game:request_dodge(key)
+        last_tap_key = nil
+      else
+        last_tap_key, last_tap_at = key, now
+      end
+    end
+    return true
+  end
+  return false
 end
 
 function on_tick(ms)

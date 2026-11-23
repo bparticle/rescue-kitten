@@ -16,6 +16,10 @@ local MAX_SCORCH_MARKS, SCORCH_MERGE_DISTANCE = 8, 8
 local MAX_PARTICLES, MAX_PROJECTILES, PLAYER_PROJECTILE_RESERVE = 76, 32, 8
 local KNOCK_DECAY, RECOVER_AFTER = 12, 3
 local PLAYER_SURFACE = {name="PLAYER", health=100, radius=6, scale={}}
+-- Carrying the kitten slows the player. A dash is a short burst with no damage taken.
+local CARRY_SPEED, DASH_TIME, DASH_SPEED, DASH_COOLDOWN = 0.85, 0.16, 330, 0.7
+-- A kill freezes the action for a moment. Kills in quick succession build a streak multiplier.
+local HITSTOP, STREAK_WINDOW, MAX_STREAK, POPUP_TIME, MAX_POPUPS = 0.06, 2.5, 4, 0.7, 5
 local diagonal = 1 / sqrt(2)
 local directions = {
   {0,-1}, {diagonal,-diagonal}, {1,0}, {diagonal,diagonal},
@@ -77,7 +81,8 @@ local function terrain(cells, columns, rows, seed)
 end
 
 -- arsenal: weapon IDs kept from earlier missions ({[id]=true}); missions start with them in hand.
-function Game.new(seed, drill, surveyed_ground, practice, arsenal)
+-- checkpoint: a mission snapshot to resume from (lib/mission.lua), or nil.
+function Game.new(seed, drill, surveyed_ground, practice, arsenal, checkpoint)
   local x, y = 448, 320
   local ground = surveyed_ground or {}
   local game = setmetatable({
@@ -93,7 +98,8 @@ function Game.new(seed, drill, surveyed_ground, practice, arsenal)
   if drill == "level" then
     Level, Mission = require("lib.level"), require("lib.mission")
     game.enemy_targets, game.level_id, game.arsenal = {game}, practice, arsenal
-    game.survey = coroutine.create(function() Mission.start(game, practice) end)
+    game.popups, game.streak, game.freeze = {}, 0, 0
+    game.survey = coroutine.create(function() Mission.start(game, practice, checkpoint) end)
     return game
   end
   if not surveyed_ground then
@@ -170,8 +176,23 @@ function Game:message(text)
 end
 
 function Game:add_score(points)
-  self.score = self.score + (self.score_boost and 2*points or points)
-  self.dirty = true
+  points = self.score_boost and 2*points or points
+  self.score, self.dirty = self.score + points, true
+  return points
+end
+
+-- A floating label above a defeated enemy. The oldest goes when the list is full.
+function Game:popup(x, y, label)
+  local popups = self.popups
+  if #popups == MAX_POPUPS then table.remove(popups, 1) end
+  popups[#popups+1] = {x=x, y=y, label=label, born=self.time}
+end
+
+-- A double-tapped direction starts a dash. key is the tapped direction; held keys can angle it.
+function Game:request_dodge(key)
+  if self.health == 0 or self.result or self.time < (self.dash_ready_at or 0) then return false end
+  self.dash_request = key
+  return true
 end
 
 function Game:request_fire()
@@ -470,6 +491,10 @@ Game.reserve_enemy_attack = Squad.reserve_attack
 
 function Game:enemy_hit(amount, effect)
   local damage = self:damage(self, amount, effect)
+  if damage == 0 and self.dash_until and self.time < self.dash_until then
+    self:message("DODGED")
+    return
+  end
   self:report(self, effect, damage)
 end
 
@@ -711,6 +736,7 @@ function Game:clear_frost(target)
 end
 
 function Game:damage(target, amount, effect, contacts)
+  if target == self and self.dash_until and self.time < self.dash_until then return 0 end
   local scale = target.surface.scale[effect] or 1
   local damage = min(target.health, max(1, floor(amount * scale + 0.5)))
   target.health = target.health - damage
@@ -724,7 +750,13 @@ function Game:damage(target, amount, effect, contacts)
   if target.health == 0 then
     target.burn = nil
     if damage > 0 and target.profile then
-      if self.score then self:add_score(DEFEAT_POINTS) end
+      if self.score then
+        self.streak = self.time <= (self.streak_until or -1) and min(MAX_STREAK, self.streak+1) or 1
+        self.streak_until = self.time + STREAK_WINDOW
+        local points = self:add_score(DEFEAT_POINTS*self.streak)
+        self:popup(target.x, target.y-10, "+" .. points .. (self.streak > 1 and " X" .. self.streak or ""))
+      end
+      if self.freeze then self.freeze = HITSTOP end
       local bodies = self.bodies
       bodies[#bodies+1] = {x=target.x, y=target.y, roof=target.roof, skin=target.profile.skin}
     end
@@ -1222,6 +1254,11 @@ end
 function Game:update(ms, keys)
   if self.result then return end
   local dt = clamp(ms, 0, 80) / 1000
+  if self.freeze and self.freeze > 0 then
+    -- Hitstop: the frame holds while the clock waits.
+    self.freeze, self.dt, self.dirty = max(0, self.freeze - dt), 0, true
+    return
+  end
   self.dt = dt
   self.time, self.cooldown = self.time + dt, max(0, self.cooldown - dt)
   if self.score_boost_until then
@@ -1240,15 +1277,35 @@ function Game:update(ms, keys)
   if self.flash > 0 then self.flash, self.dirty = max(0, self.flash-dt), true end
   if self.hurt_until and self.time >= self.hurt_until then self.hurt_until, self.dirty = nil, true end
   if self.notice and self.time >= self.message_until then self.notice, self.dirty = nil, true end
+  local popups = self.popups
+  if popups and popups[1] then
+    while popups[1] and self.time - popups[1].born >= POPUP_TIME do table.remove(popups, 1) end
+    self.dirty = true
+  end
   self:update_targets()
 
   if self.health > 0 then
     local dx = (keys.right and 1 or 0) - (keys.left and 1 or 0)
     local dy = (keys.down and 1 or 0) - (keys.up and 1 or 0)
     local direction = facing[dy+2][dx+2]
-    if direction ~= 0 then
+    if self.dash_request then
+      -- Held keys angle the dash; with none held it follows the tapped direction.
+      local key = self.dash_request
+      if direction == 0 then
+        direction = key == "up" and 1 or key == "right" and 3 or key == "down" and 5 or 7
+      end
+      self.dash_request, self.dash_direction = nil, direction
+      self.dash_until, self.dash_ready_at = self.time + DASH_TIME, self.time + DASH_COOLDOWN
+      self:burst(self.x, self.y+4, 4, "dust")
+    end
+    if self.dash_until and self.time < self.dash_until then
+      local d, travel = directions[self.dash_direction], DASH_SPEED*dt
+      self:move_actor(self, d[1]*travel, d[2]*travel, self.dash_direction)
+      self.dirty = true
+    elseif direction ~= 0 then
       local d = directions[direction]
-      local travel = MOVE_SPEED*dt*(self.frost_speed or 1)
+      local carrying = self.mission and self.mission.carrying
+      local travel = MOVE_SPEED*dt*(self.frost_speed or 1)*(carrying and CARRY_SPEED or 1)
       if self:move_actor(self, d[1]*travel, d[2]*travel, direction) and not self.level then self:collect() end
     elseif self.pose ~= 1 then self.pose, self.walk, self.dirty = 1, 0, true end
     if self.level then

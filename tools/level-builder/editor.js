@@ -300,7 +300,7 @@ function drawEntity(entity) {
       vctx.fillRect(x + 5, y - 13, 7, 7);
       vctx.fillStyle = '#ecd590';
       vctx.font = 'bold 6px monospace';
-      vctx.fillText(String(entity.wave || 1), x + 6.5, y - 7.5);
+      vctx.fillText(entity.alarm ? 'A' : String(entity.wave || 1), x + 6.5, y - 7.5);
       if (entity.rooftop) {
         vctx.strokeStyle = '#79e1e6';
         vctx.beginPath();
@@ -620,6 +620,7 @@ function placeEntity(px, py, free) {
   } else if (type === 'enemy') {
     entity = { type, kind: $('ent-kind').value, x, y, dir: Number($('ent-dir').value), wave: Number($('ent-wave').value) || 1 };
     if ($('ent-surface').value === 'roof') entity.rooftop = true;
+    if ($('ent-arrives').value === 'alarm') entity.alarm = true;
   } else if (type === 'pickup') {
     entity = { type, weapon: Number($('ent-weapon').value), x, y };
   } else {
@@ -638,6 +639,7 @@ function selectEntity(entity) {
     if (entity.dir !== undefined) $('ent-dir').value = entity.dir;
     if (entity.wave) $('ent-wave').value = entity.wave;
     if (entity.type === 'enemy') $('ent-surface').value = entity.rooftop ? 'roof' : 'ground';
+    if (entity.type === 'enemy') $('ent-arrives').value = entity.alarm ? 'alarm' : 'wave';
     if (entity.weapon !== undefined) $('ent-weapon').value = entity.weapon;
   }
   render();
@@ -937,6 +939,10 @@ function buildUi() {
   $('ent-surface').addEventListener('change', () => editSelected((e) => {
     if (e.type === 'enemy') e.rooftop = $('ent-surface').value === 'roof';
   }));
+  $('ent-arrives').addEventListener('change', () => editSelected((e) => {
+    if (e.type !== 'enemy') return;
+    if ($('ent-arrives').value === 'alarm') e.alarm = true; else delete e.alarm;
+  }));
   $('ent-dir').addEventListener('change', () => editSelected((e) => {
     if (e.type === 'spawn' || e.type === 'enemy') e.dir = Number($('ent-dir').value);
   }));
@@ -1076,7 +1082,7 @@ function runChecks() {
   const issues = validate(state.level, state.mats);
   const errors = issues.filter((i) => i.severity === 'error').length;
   const enemies = state.level.entities.filter((e) => e.type === 'enemy');
-  const waves = new Set(enemies.map((e) => e.wave || 1)).size;
+  const waves = new Set(enemies.filter((e) => !e.alarm).map((e) => e.wave || 1)).size;
   $('issue-count').textContent = `${errors} errors · ${issues.length - errors} warnings · ${enemies.length} enemies in ${Math.max(1, waves)} wave${waves > 1 ? 's' : ''}`;
   $('issues').replaceChildren(...(issues.length ? issues : [{ severity: 'ok', message: 'Ready to export.' }]).map((issue) => {
     const item = document.createElement('li');
