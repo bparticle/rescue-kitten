@@ -71,7 +71,11 @@ async function measure(native) {
       function bench_wound_pair()
         for index = 1, 2 do game:damage(game.enemies[index], 24, "impact") end
       end
-      function bench_total_waves() return game.squad.total end
+      function bench_clear_wave()
+        game.result, game.health = nil, game.surface.health
+        game.squad.deployed = #game.squad.roster
+        for _, enemy in ipairs(game.enemies) do enemy.health = 0 end
+      end
       function bench_late_endless_wave() game.squad.wave = 14 end
       function bench_drop_one_enemy() game.enemies[1].health = 0 end
       function bench_reinforcement_is_marked() return game.squad.incoming ~= nil end
@@ -116,6 +120,9 @@ async function measure(native) {
       return result;
     };
 
+    await badge.press('back');
+    await badge.press('up');
+    await badge.press('select');
     await badge.frames(12);
     assert.equal(images.length, native ? 48 : 0);
     const frame = () => createHash('sha256').update(badge.rgba()).digest('hex');
@@ -124,35 +131,28 @@ async function measure(native) {
     await badge.press('up');
     await badge.press('up');
     await badge.press('select');
-    combatStage = 'Squad Trial';
+    assert.equal(badge.lua('return select(13, range_status())'), 'endless');
+    combatStage = 'Endless opening waves';
 
-    // Play the start of each wave, then jump to the next to reach the heaviest live group.
+    // Play the start of each early wave, then jump to the next to reach a busy live group.
     const wave = () => badge.lua('return select(16, range_status())');
-    const totalWaves = badge.lua('return bench_total_waves()');
-    while (wave() < totalWaves) {
+    assert.equal(wave(), 1);
+    while (wave() < 7) {
       await wait(800);
-      badge.lua('bench_finish_wave()');
+      badge.lua('bench_clear_wave()');
       const previous = wave();
       await wait(1700);
       assert.equal(wave(), previous + 1);
     }
     badge.lua('bench_wound_pair()');
     await wait(900);
-    const squadFrame = frame();
+    const openingFrame = frame();
     await badge.press('select');
     await wait(3500);
     combatStage = null;
 
-    badge.lua('bench_finish_wave(true)');
-    await badge.frames(1);
-    assert.equal(badge.lua('return select(15, range_status())'), 'won');
-    assert.equal(JSON.parse(badge.storageJson()).endless_unlocked, true);
-    await badge.press('right');
-    assert.equal(badge.lua('return select(13, range_status())'), 'endless');
-    assert.equal(wave(), 1);
-
     combatStage = 'Endless Run';
-    badge.lua('bench_late_endless_wave(); bench_finish_wave()');
+    badge.lua('bench_late_endless_wave(); bench_clear_wave()');
     await wait(1730);
     assert.equal(wave(), 15);
     const remaining = () => badge.lua('return select(17, range_status())');
@@ -197,7 +197,7 @@ async function measure(native) {
     assert.ok(peakHeap + imageKiB < 4 * 1024, 'keep at least 2 MiB of badge heap headroom in the model');
     assert.ok(retainedGrowth < 24, `trial restarts retained ${retainedGrowth.toFixed(1)} KiB`);
     assert.equal(peakObjects, 3);
-    return { rangeFrame, squadFrame, reinforcementFrame, save: badge.storageJson() };
+    return { rangeFrame, openingFrame, reinforcementFrame, save: badge.storageJson() };
   } finally {
     badge.close();
   }
@@ -205,19 +205,4 @@ async function measure(native) {
 
 const packed = await measure(false);
 const native = await measure(true);
-assert.deepEqual(native, packed, 'both renderers should produce identical RGB565 frames and unlocks');
-
-const relaunched = await new SolanaOS({dir: app, storageJson: packed.save}).launch();
-try {
-  installHeadlessClock(relaunched, tick);
-  await relaunched.frames(12);
-  await relaunched.hold('back', Math.ceil(1240 / tick));
-  await relaunched.press('up');
-  await relaunched.press('up');
-  await relaunched.press('select');
-  assert.equal(relaunched.lua('return select(13, range_status())'), 'endless');
-  assert.deepEqual(relaunched.errors, []);
-  console.log('The Endless Run unlock survived a relaunch.');
-} finally {
-  relaunched.close();
-}
+assert.deepEqual(native, packed, 'both renderers should produce identical RGB565 frames and saves');

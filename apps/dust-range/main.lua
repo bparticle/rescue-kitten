@@ -15,10 +15,10 @@ local MENU_HOLD_MS = 1200
 local scene, choice, page = "range", 1, 1
 local enemy_page, enemy_guide = 1, false
 local cancel_pressed_at, resume_keys, menu_dirty
-local endless_unlocked = storage and storage.get("endless_unlocked") == true
 local has_index, levels = pcall(require, "levels.index")
 if not has_index or type(levels) ~= "table" then levels = {} end
 local has_levels, level_choice = #levels > 0, 1
+local briefing_choice, active_mission, missions_back = 1, nil, "briefing"
 screen:loading()
 if indicators then indicators:clear() end
 if sys.tick then sys.tick(16) end
@@ -30,35 +30,71 @@ local function open_menu()
   menu_dirty = true
 end
 
-local function resume_range()
+local function resume_game()
   scene, resume_keys = "range", sys.keys()
   game.dirty = true
   menu:close()
 end
 
-local function start_drill(kind, practice)
-  game = Game.new(SEED, kind, not range.survey and range.ground or nil, practice)
+local function start_game(kind, id)
+  game = Game.new(SEED, kind, not range.survey and range.ground or nil, id)
   if game.survey then screen:loading() end
-  resume_range()
+  resume_game()
+end
+
+local function show_briefing(index)
+  briefing_choice, scene, menu_dirty = index, "briefing", true
+  menu:open()
+end
+
+local function show_missions(from, index)
+  missions_back, level_choice = from, index
+  scene, menu_dirty = "missions", true
+  menu:open()
+end
+
+local function open_range()
+  game = range
+  if range.survey then screen:loading() end
+  resume_game()
+end
+
+if has_levels then show_briefing(1) end
+
+local function retry()
+  if game.mission then show_briefing(active_mission)
+  else start_game(game.drill or true, game.practice) end
 end
 
 local function navigate(key, repeated)
   if key == "back" then
     if repeated then return end
-    if scene == "specs" or scene == "levels" then
+    if scene == "briefing" then
+      show_missions(missions_back, briefing_choice)
+    elseif scene == "missions" then
+      if missions_back == "briefing" then show_briefing(briefing_choice)
+      elseif missions_back == "range" then resume_game()
+      else scene, menu_dirty = "menu", true end
+    elseif scene == "specs" then
       scene, menu_dirty = "menu", true
     else
-      resume_range()
+      resume_game()
     end
-  elseif scene == "levels" then
+  elseif scene == "briefing" then
+    if key == "select" and not repeated then
+      active_mission = briefing_choice
+      start_game("level", levels[active_mission].id)
+    end
+  elseif scene == "missions" then
     if key == "up" or key == "down" then
-      level_choice = (level_choice - 1 + (key == "up" and -1 or 1)) % #levels + 1
+      level_choice = (level_choice - 1 + (key == "up" and -1 or 1)) % (#levels + 1) + 1
       menu_dirty = true
     elseif key == "select" and not repeated then
-      start_drill("level", levels[level_choice].id)
+      if levels[level_choice] then show_briefing(level_choice)
+      else open_range() end
     end
   elseif scene == "menu" then
-    local options = Menu.options(game.drill, endless_unlocked, has_levels)
+    local options = Menu.options(game.drill, has_levels)
     if key == "up" or key == "down" then
       choice = (choice - 1 + (key == "up" and -1 or 1)) % #options + 1
       menu_dirty = true
@@ -68,15 +104,14 @@ local function navigate(key, repeated)
       menu_dirty = true
     elseif key == "select" and not repeated then
       local action = options[choice][1]
-      if action == "resume" then resume_range()
+      if action == "resume" then resume_game()
       elseif action == "specs" then scene, enemy_guide, menu_dirty = "specs", false, true
-      elseif action == "drill" then start_drill(game.drill or true, game.level_id or game.practice)
-      elseif action == "levels" then scene, menu_dirty = "levels", true
-      elseif action == "squad" then start_drill("squad")
-      elseif action == "endless" then start_drill("endless")
-      elseif action == "range" then
-        game = range
-        resume_range()
+      elseif action == "drill" then
+        if game.mission then missions_back = "menu" end
+        retry()
+      elseif action == "missions" then show_missions("menu", game.mission and active_mission or 1)
+      elseif action == "endless" then start_game("endless")
+      elseif action == "range" then open_range()
       else sys.exit() end
     end
   elseif (key == "up" or key == "down") and not repeated then
@@ -87,7 +122,7 @@ local function navigate(key, repeated)
       enemy_page = (enemy_page - 1 + (key == "left" and -1 or 1)) % #Enemies.guide + 1
       menu_dirty = true
     elseif key == "select" and not repeated then
-      start_drill("practice", Enemies.guide[enemy_page][1])
+      start_game("practice", Enemies.guide[enemy_page][1])
     end
   elseif key == "left" or key == "right" or (key == "select" and not repeated) then
     page = (page - 1 + (key == "left" and -1 or 1)) % #Game.weapons + 1
@@ -102,15 +137,16 @@ function on_key(key, repeat_key)
     return true
   end
   if resume_keys and not repeated then resume_keys[key] = nil end
+  if game.survey then return true end
   if key == "select" then
     if not repeated then
-      if game.result then start_drill(game.drill, game.level_id or game.practice)
+      if game.result == "won" and game.mission then
+        show_missions("range", active_mission % #levels + 1)
+      elseif game.result then
+        if game.mission then missions_back = "range" end
+        retry()
       else game:request_fire() end
     end
-    return true
-  end
-  if key == "right" and not repeated and game.drill == "squad" and game.result == "won" then
-    start_drill("endless")
     return true
   end
   if key == "back" then
@@ -136,8 +172,11 @@ function on_tick(ms)
   end
   if scene ~= "range" then
     if menu_dirty then
-      if scene == "levels" then
-        menu:draw_levels(level_choice, levels)
+      if scene == "briefing" then
+        menu:draw_briefing(levels[briefing_choice], briefing_choice)
+        if indicators then indicators:clear() end
+      elseif scene == "missions" then
+        menu:draw_missions(level_choice, levels)
         if indicators then indicators:clear() end
       elseif scene == "specs" then
         if enemy_guide then
@@ -150,8 +189,7 @@ function on_tick(ms)
           if indicators then indicators:show_spec(page) end
         end
       else
-        menu:draw_pause(choice, game, screen:weapon_art(game:held_weapon())[game.direction][1], endless_unlocked,
-          has_levels, screen.pickup_motion)
+        menu:draw_pause(choice, game, screen:weapon_art(game:held_weapon())[game.direction][1], has_levels, screen.pickup_motion)
         if indicators then indicators:clear() end
       end
       menu_dirty = false
@@ -172,10 +210,6 @@ function on_tick(ms)
     if not next(resume_keys) then resume_keys = nil end
   end
   game:update(ms, keys)
-  if game.drill == "squad" and game.result == "won" and not endless_unlocked then
-    endless_unlocked = true
-    if storage then pcall(storage.set, "endless_unlocked", true) end
-  end
   if indicators then indicators:update(game) end
   if game.dirty or screen:needs_pickup_frame(game) then
     screen:draw(game)

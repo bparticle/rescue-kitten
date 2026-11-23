@@ -12,12 +12,12 @@ end
 local profiles = {
   soldier = {
     behavior=Ranged.update, skin="soldier", weapon=1, speed=52,
-    notice_range=116, fire_range=68, retreat_range=24, windup=0.52, recovery=0.95,
+    notice_range=116, fire_range=68, retreat_range=36, windup=0.52, recovery=0.95,
     surface={name="SOLDIER", health=54, radius=7, scale={}, light=true},
   },
   runner = {
     behavior=Melee.update, skin="runner", weapon=0, speed=91,
-    notice_range=300, fire_range=15, windup=0.44, recovery=0.65, hit_radius=9, damage=16,
+    notice_range=300, fire_range=15, standoff=52, circle_speed=26, windup=0.44, recovery=0.85, hit_radius=9, damage=16,
     surface={name="RUNNER", health=27, radius=7, scale={}, light=true},
   },
   rifleman = {
@@ -28,38 +28,38 @@ local profiles = {
   },
   scatterguard = {
     behavior=Ranged.update, skin="scatterguard", weapon=3, speed=65,
-    notice_range=300, fire_range=38, retreat_range=16, windup=0.63, recovery=1.14,
+    notice_range=300, fire_range=46, retreat_range=30, windup=0.63, recovery=1.14,
     shot=enemy_shot(3, {damage=7, count=3, spread=0.20}),
     surface={name="SCATTERGUARD", health=64, radius=8, scale={impact=0.85}},
   },
   lobber = {
     behavior=Ranged.update, skin="lobber", weapon=4, speed=47,
-    notice_range=120, fire_range=54, retreat_range=27, windup=0.68, recovery=1.56,
+    notice_range=120, fire_range=58, retreat_range=36, windup=0.68, recovery=1.56,
     shot=enemy_shot(4, {aimed_lob=true, damage=27, radius=19, speed=82, life=0.78}),
     surface={name="LOBBER", health=40, radius=7, scale={}, light=true},
   },
   warden = {
     behavior=Ranged.update, skin="warden", weapon=1, speed=34,
-    notice_range=120, fire_range=49, retreat_range=12, windup=0.64, recovery=1.18,
+    notice_range=120, fire_range=50, retreat_range=26, windup=0.64, recovery=1.18,
     frontal_damage=0.30, shot=enemy_shot(1, {damage=13, speed=290}),
     surface={name="WARDEN", health=80, radius=9, scale={}},
   },
   skirmisher = {
     behavior=Ranged.update, skin="skirmisher", weapon=9, speed=63, strafe_speed=55,
-    notice_range=128, fire_range=60, retreat_range=32, windup=0.46, recovery=0.95,
+    notice_range=128, fire_range=62, retreat_range=38, windup=0.46, recovery=0.95,
     shot=enemy_shot(1, {damage=12, speed=300, muzzle=7}),
     surface={name="SKIRMISHER", health=36, radius=7, scale={}, light=true},
   },
   medic = {
     behavior=Support.update, on_hit=Support.interrupt, skin="medic", weapon=1, speed=62,
-    notice_range=128, fire_range=43, retreat_range=20, windup=0.62, recovery=1.25,
+    notice_range=128, fire_range=46, retreat_range=30, windup=0.62, recovery=1.25,
     heal=26, heal_range=41, heal_windup=0.65, heal_recovery=1.15,
     shot=enemy_shot(1, {damage=10, speed=275}),
     surface={name="MEDIC", health=46, radius=7, scale={}, light=true},
   },
   bruiser = {
     behavior=Charge.update, on_hit=Charge.interrupt, skin="bruiser", weapon=0, speed=44,
-    notice_range=125, fire_range=48, windup=0.72, recovery=1.06,
+    notice_range=125, fire_range=50, retreat_range=34, windup=0.72, recovery=1.06,
     dash_distance=58, dash_speed=168, contact_radius=11, damage=28,
     surface={name="BRUISER", health=112, radius=10, scale={smash=0.75}},
   },
@@ -71,13 +71,13 @@ local profiles = {
   },
   cinder = {
     behavior=Ranged.update, skin="cinder", weapon=6, speed=61, drop=6,
-    notice_range=120, fire_range=28, retreat_range=12, windup=0.59, recovery=1.28,
+    notice_range=120, fire_range=33, retreat_range=24, windup=0.59, recovery=1.28,
     shot=enemy_shot(6, {damage=2, life=0.23, burn_damage=3, burn_ticks=3, burn_interval=0.28}),
     surface={name="CINDER", health=58, radius=8, scale={heat=0.55, burn=0.55}},
   },
   cryo = {
     behavior=Ranged.update, skin="cryo", weapon=12, speed=67, drop=12,
-    notice_range=120, fire_range=29, retreat_range=15, windup=0.68, recovery=1.38,
+    notice_range=120, fire_range=33, retreat_range=24, windup=0.68, recovery=1.38,
     shot=enemy_shot(12, {damage=1, life=0.25, frost_time=1.28, frost_speed=0.74, shatter=10}),
     surface={name="CRYO TECH", health=47, radius=8, scale={frost=0.5}, light=true},
   },

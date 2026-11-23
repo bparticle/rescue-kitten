@@ -40,6 +40,7 @@ export const OBJECTIVES = {
   clear: 'Defeat every wave',
   exit: 'Reach the exit',
   'clear-exit': 'Defeat every wave, then reach the exit',
+  'rescue-kitten': 'Rescue kitten and carry it to the exit',
 };
 
 // Terrain cells reuse the procedural range tiles: 12 tiles x 4 rotations = indexes 1..48.
@@ -399,14 +400,21 @@ export function validate(level, materials) {
   const spawns = level.entities.filter((e) => e.type === 'spawn');
   const enemies = level.entities.filter((e) => e.type === 'enemy');
   const exits = level.entities.filter((e) => e.type === 'exit');
+  const kittens = level.entities.filter((e) => e.type === 'kitten');
   const pickups = level.entities.filter((e) => e.type === 'pickup');
+  const rescue = level.objective === 'rescue-kitten';
+  const clear = level.objective === undefined || ['clear', 'clear-exit'].includes(level.objective);
   if (spawns.length !== 1) add('error', spawns.length ? 'Only one player spawn is allowed.' : 'Place a player spawn.');
   if (exits.length > 1) add('error', 'Only one exit is allowed.');
-  if (['exit', 'clear-exit'].includes(level.objective) && !exits.length) add('error', 'This objective needs an exit.');
-  if (level.objective !== 'exit' && !enemies.length) add('warn', 'No enemies: a clear objective wins instantly.');
-  if (!(level.loadout || []).length && !pickups.length) add('warn', 'The player starts unarmed and there are no weapon pickups.');
+  if (kittens.length > 1) add('error', 'Only one kitten is allowed.');
+  if (rescue && !kittens.length) add('error', 'This objective needs a kitten.');
+  if ((rescue || ['exit', 'clear-exit'].includes(level.objective)) && !exits.length) add('error', 'This objective needs an exit.');
+  if (clear && !enemies.length) add('warn', 'No enemies to clear.');
+  if ((!rescue || enemies.length) && !(level.loadout || []).length && !pickups.length) {
+    add('warn', 'The player starts unarmed and there are no weapon pickups.');
+  }
   const weaponIds = [...(Array.isArray(level.loadout) ? level.loadout : []), ...pickups.map((pickup) => pickup.weapon)];
-  if (level.objective !== 'exit' && enemies.some((enemy) => enemy.rooftop)
+  if (clear && enemies.some((enemy) => enemy.rooftop)
     && !weaponIds.some((id) => validWeapon(id) && ![4, 7, 10, 14, 15].includes(id))) {
     add('warn', 'Add a direct-fire weapon so the player can hit rooftop enemies.');
   }
@@ -423,7 +431,7 @@ export function validate(level, materials) {
     const cell = Number.isFinite(entity.x) && Number.isFinite(entity.y) ? cellOf(level, x, y) : -1;
     const label = entity.type === 'enemy' ? `${entity.kind} (wave ${entity.wave || 1})`
       : entity.type === 'pickup' ? `${WEAPONS[entity.weapon] || 'Unknown weapon'} pickup` : entity.type;
-    if (!['spawn', 'enemy', 'pickup', 'medkit', 'exit'].includes(entity.type)) {
+    if (!['spawn', 'enemy', 'pickup', 'medkit', 'kitten', 'exit'].includes(entity.type)) {
       add('error', 'Unknown entity type.', entity);
       continue;
     }
@@ -512,8 +520,7 @@ export function toLua(level, materials) {
     if (e.type === 'spawn') return `{"spawn",${x},${y},${(e.dir ?? 4) + 1}}`;
     if (e.type === 'enemy') return `{"enemy",${luaString(e.kind)},${x},${y},${(e.dir ?? 4) + 1},${e.wave || 1}${e.rooftop ? ',true' : ''}}`;
     if (e.type === 'pickup') return `{"pickup",${e.weapon},${x},${y}}`;
-    if (e.type === 'medkit') return `{"medkit",${x},${y}}`;
-    return `{"exit",${x},${y}}`;
+    return `{${luaString(e.type)},${x},${y}}`;
   };
   const meta = summary(level);
   const lines = [

@@ -53,10 +53,17 @@ function Charge.update(game, enemy)
     return
   end
 
-  if game.time < enemy.ready_at then return end
   local dx, dy = game.x-enemy.x, game.y-enemy.y
   local distance = sqrt(dx*dx + dy*dy)
   local direction = distance > 0 and game.direction_of(dx, dy) or enemy.direction
+  -- After a charge, back off to a readable distance before lining up the next one.
+  local retreat = profile.retreat_range or 0
+  local backing = enemy.alerted and distance > 0 and distance < retreat
+  if backing then
+    local step = min(profile.speed*game.dt, retreat-distance+0.75)/distance
+    if game:move_actor(enemy, -dx*step, -dy*step, direction) or game.time < enemy.ready_at then return end
+  end
+  if game.time < enemy.ready_at then return end
   local blocked = game:obstructed() and not game:melee_clear(enemy.x,enemy.y,game.x,game.y)
   if not enemy.alerted and distance > profile.notice_range then
     game:move_actor(enemy, 0, 0, enemy.direction)

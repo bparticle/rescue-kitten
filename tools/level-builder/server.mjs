@@ -1,4 +1,4 @@
-// Dust Range level builder. Run: node tools/level-builder/server.mjs [port]
+// Dustpaw level builder. Run: node tools/level-builder/server.mjs [port]
 // Serves the editor on http://localhost:5178 and saves to levels/ (sources) and
 // apps/dust-range/levels/ (exported Lua the badge loads). No npm packages needed.
 import http from 'node:http';
@@ -30,6 +30,7 @@ const assets = {
   '/assets/tileset.png': path.join(root, 'sprites', 'tiles', 'tileset.png'),
   '/assets/terrain.png': path.join(root, 'sprites', 'terrain', 'barren-terrain.png'),
   '/assets/idle-hero.png': path.join(root, 'sprites', 'hero', 'idle-hero.png'),
+  '/assets/entities/kitten.png': path.join(root, 'sprites', 'entities', 'kitten.png'),
   '/assets/walk-layout.json': path.join(root, 'sprites', 'hero', 'walk-layout.json'),
 };
 for (const file of fs.readdirSync(path.join(root, 'sprites', 'weapons'))) {
@@ -180,6 +181,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(port, '127.0.0.1', () => {
-  console.log(`Dust Range level builder: http://localhost:${port}`);
+  console.log(`Dustpaw level builder: http://localhost:${port}`);
   console.log(`Sources: ${path.relative(root, sources)}  Export: ${path.relative(root, exported)}`);
 });

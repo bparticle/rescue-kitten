@@ -1,12 +1,14 @@
-# Dust Range
+# Dustpaw
 
-A top-down range for the Breakpoint 2026 badge. It uses the Lua canvas and controls from the Mosa Badge development environment. The terrain is seeded and built at launch from the dirt, grass, and mud tiles.
+A top-down mission game for the Breakpoint 2026 badge. It uses the Lua canvas and controls from the Mosa Badge development environment.
 
 ## Play
 
-Open the [Solana OS app loader](https://solana.com/breakpoint/badge/apps/submit) and drop in `dist/dust-range.zip` or the `apps/dust-range` folder. Choose **Try in emulator** to play in the browser or **Run on badge** to sideload over USB.
+Open the [Solana OS app loader](https://solana.com/breakpoint/badge/apps/submit) and drop in `dist/dustpaw.zip` or the `apps/dust-range` folder. Choose **Try in emulator** to play in the browser or **Run on badge** to sideload over USB.
 
 Use Solana OS 2.0 or newer for the 6 MiB Lua heap. The app uses the LED permission. Solana OS 2.3 and later support its 16 ms tick request.
+
+Dustpaw opens on the **Rescue Kitten** title card. Press **Select** to start, walk up to the kitten to pick it up, then carry it to the exit. After a successful rescue, **Select** opens **Missions** so you can continue to **Outpost**. For free practice, press **Cancel** on the title card and choose **Testing Range**. The range is also available from the mission pause menu.
 
 - **D-pad** moves the hero and sets the firing direction. Walk over a floating weapon to pick it up and equip it. When the nearest available pickup is at the edge of the screen or beyond it, the marker is amber for weapons and a green cross for medkits.
 - **Select** fires, throws, swings, or places the equipped item. Hold it for the rifle, flamethrower and cryo sprayer. Hold and release it to fire the charge cannon. The range has unlimited ammunition.
@@ -22,21 +24,21 @@ The six top LEDs show the equipped weapon's family: 1 pistols (handgun, bankshot
 
 Your health is shown at the right of the HUD in every mode. Each combat drill starts at 100 HP. When wounded, you also get a small bar above your character. The playfield border and two side LEDs flash on damage, and the HUD warns at 25 HP or below. The weapon-testing range is safe for testing your gear.
 
-Walk over a medkit in Squad Trial or Outpost to restore up to 30 HP. A medkit stays available until you pick it up while wounded.
+Walk over a medkit in a mission to restore up to 30 HP. A medkit stays available until you pick it up while wounded.
 
 ## Combat drills
 
 - **Soldier Drill** is a one-on-one handgun duel. The soldier stops and shows a gold marker before each shot. Move away from the spot where it first took aim.
-- **Squad Trial** has seven waves. Runners mark the ground before striking, riflemen fire bursts, and scatterguards approach for a short spread. Lobbers mark a grenade's landing zone. Wardens lower their frontal shield while aiming, and skirmishers strafe between shots. Hit a medic during its green cue to interrupt a heal. Sidestep a bruiser's marked charge or interrupt it with the arc projector. A red edge marker points to an enemy beyond the screen.
-- Between waves you recover up to 24 HP and clear burn and frost effects. The HUD shows BURNING or CHILLED while those effects are active. The assault rifle, pump shotgun, and rail rifle unlock after the first three waves. The arc projector unlocks before wave six. Tap **Cancel** to switch between the weapons you have earned.
+- **Endless Run** is a wave survival mode, available from the range menu. You start with the handgun, assault rifle, pump shotgun, rail rifle and arc projector. Tap **Cancel** to switch between them. Later waves can contain up to 14 enemies, with at most eight active at once. Gold ground markers show where reinforcements will arrive.
+- Runners circle at a distance and rush in one at a time, then mark the ground before striking. Riflemen fire bursts, and scatterguards hold just inside their short spread. Lobbers mark a grenade's landing zone. Wardens lower their frontal shield while aiming, and skirmishers strafe between shots. Hit a medic during its green cue to interrupt a heal. Sidestep a bruiser's marked charge or interrupt it with the arc projector. Bruisers back off after each charge. A red edge marker points to an enemy beyond the screen.
+- Between waves you recover up to 24 HP and clear burn and frost effects. The HUD shows BURNING or CHILLED while those effects are active.
 - At 0 HP, combat stops. After a win or loss, press **Select** to retry at full health. Hold **Cancel** to pause, then choose **Back to Range** to resume the original weapon-testing session.
-- Clearing Squad Trial unlocks **Endless Run**. Press **Right** on the victory screen or select it from the range menu. The starting loadout includes the trial's four unlockable weapons and the handgun. Later waves can contain up to 14 enemies, with at most eight active at once. Gold ground markers show where reinforcements will arrive. The unlock is stored on the badge.
 - Endless Run rotates its barricade layout every three waves. Barricades block movement and direct shots. Enemies route around them, and lobbers can aim over them. Late marksmen show a pink lane before they fire.
 - Cinders can leave the player burning. Cryo techs slow movement until their frost wears off or a follow-up hit shatters it. Each can drop its weapon once per run.
 
-## Levels
+## Level editor
 
-Choose **LEVELS** in the pause menu to play maps made with the level builder. Walls, wall openings, sandbags, hedges, water and roofs each block movement, gunfire, grenades or sight differently. Some tiles break or explode, and roofs hide while you are inside a building. Run `node tools/level-builder/server.mjs` and open http://localhost:5178 to build levels. [docs/LEVELS.md](docs/LEVELS.md) lists every tile property and builder shortcut.
+Run `node tools/level-builder/server.mjs` and open http://localhost:5178 to build missions. To make a rescue mission, choose **Rescue kitten and carry it to the exit**, then place a **Kitten** and an **Exit** with the Entities tool. Export the level to add it to **Missions**. [Level editor guide](docs/LEVELS.md)
 
 ## Weapon and target specifications
 
@@ -91,6 +93,6 @@ Each of the 15 weapons has a hero walk sheet (`sprites/hero/walk-<weapon>.png`) 
 - `node tools/bench.mjs` measures combat, startup and repeat retries. It estimates sideload file-read costs and compares the packed-run fallback with a model of the native RGB565 tile renderer. On the badge or official emulator, `lua mem` in the console reports the previous run's actual peaks after closing the app.
 - Both tools accept `DUST_RANGE_TICK_MS=30` for the original cadence, `DUST_RANGE_APP_DIR` for an extracted release, and `MOSA_BADGE_DIR` for a different headless host checkout.
 
-Enemy profiles in `apps/dust-range/lib/enemies.lua` define health, hit radius, movement, weapons, and behavior. Range-keeping, melee timing, and support behavior live in `lib/ai/`. Authored wave rosters and gear drops live in `lib/squad.lua`. `lib/endless.lua` generates rosters from wave budgets and per-role limits with its own seeded random sequence. Both modes keep only the current wave's enemies and stagger their attack releases.
+Enemy profiles in `apps/dust-range/lib/enemies.lua` define health, hit radius, movement, weapons, and behavior. Range-keeping (`fire_range` and `retreat_range`), the melee standoff ring (`standoff`), and charge and support behavior live in `lib/ai/`. `lib/squad.lua` runs Endless Run waves, spawn spacing and the shared attack schedule, which staggers attack releases and lets only one melee rush start at a time. `lib/endless.lua` generates rosters from wave budgets and per-role limits with its own seeded random sequence. Levels use the same attack schedule.
 
-Run `python tools/package.py` to rebuild `dist/dust-range.zip` and check file count, unpacked size, and path limits.
+Run `python tools/package.py` to rebuild `dist/dustpaw.zip` and check file count, unpacked size, and path limits.

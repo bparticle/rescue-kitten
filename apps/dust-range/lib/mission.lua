@@ -1,15 +1,9 @@
 -- Plays a level exported by tools/level-builder: spawn, loadout, enemy waves and the objective.
-local Level = require("lib.level")
-
 local Mission = {}
-local BETWEEN_WAVES, WAKE_CALL, EXIT_RADIUS = 1.6, 64, 10
-
-function Mission.list()
-  local ok, index = pcall(require, "levels.index")
-  return ok and index or {}
-end
+local BETWEEN_WAVES, WAKE_CALL, INTERACT_RADIUS = 1.6, 64, 10
 
 function Mission.start(game, id)
+  local Level = require("lib.level")
   local def = require("levels." .. id)
   local level = Level.new(def)
   game.level, game.level_id = level, id
@@ -43,10 +37,13 @@ function Mission.start(game, id)
       game:add_medkit(entity[2], entity[3])
     elseif kind == "exit" then
       game.exit = {x=entity[2], y=entity[3]}
+    elseif kind == "kitten" then
+      mission.kitten = {x=entity[2], y=entity[3]}
     end
   end
-  -- Objectives: "clear" every wave, reach the "exit", or "clear-exit" (clear, then leave).
-  if mission.objective ~= "clear" and not game.exit then mission.objective = "clear" end
+  if not game.exit and (mission.objective == "exit" or mission.objective == "clear-exit") then
+    mission.objective = "clear"
+  end
   -- Waves count from 1 even if the builder skipped numbers.
   local ordered = {}
   for wave = 1, total do
@@ -55,7 +52,9 @@ function Mission.start(game, id)
   mission.waves = ordered
   game.squad = {wave=1, total=math.max(1, #ordered), remaining=0, next_attack_at=0, mission=true}
   Mission.spawn_wave(game, 1)
-  game:message(mission.objective == "exit" and "REACH THE EXIT" or (mission.name or "LEVEL"):upper())
+  if mission.objective == "rescue-kitten" then game:message("WALK UP TO THE KITTEN")
+  elseif mission.objective == "exit" then game:message("REACH THE EXIT")
+  else game:message((mission.name or "MISSION"):upper()) end
 end
 
 function Mission.spawn_wave(game, wave)
@@ -86,6 +85,11 @@ local function wake(game, enemy)
   end
 end
 
+local function in_reach(game, point)
+  local dx, dy = point.x-game.x, point.y-game.y
+  return dx*dx + dy*dy <= INTERACT_RADIUS^2 and not game:cover_entry(game.x,game.y,dx,dy,1,0,"walk")
+end
+
 function Mission.update(game)
   local squad, mission = game.squad, game.mission
   for index = #game.enemies, 1, -1 do
@@ -104,15 +108,22 @@ function Mission.update(game)
   local remaining = count_remaining(game)
   if squad.remaining ~= remaining then squad.remaining, game.dirty = remaining, true end
 
-  if game.exit then
-    local dx, dy = game.x-game.exit.x, game.y-game.exit.y
-    if dx*dx + dy*dy <= EXIT_RADIUS^2 and not game:cover_entry(game.x,game.y,dx,dy,1,0,"walk") then
-      if mission.objective == "exit" or (mission.objective == "clear-exit" and remaining == 0) then return "won" end
-      if mission.objective == "clear-exit" and not mission.exit_hint then
-        mission.exit_hint = true
-        game:message("CLEAR THE AREA FIRST")
-      end
-    elseif mission.exit_hint then mission.exit_hint = nil end
+  local rescue = mission.objective == "rescue-kitten"
+  if rescue and mission.kitten and not mission.carrying and in_reach(game, mission.kitten) then
+    mission.carrying, mission.exit_open = true, true
+    game:message("KITTEN FOUND  REACH THE EXIT")
+  end
+
+  if game.exit and in_reach(game, game.exit) then
+    if mission.objective == "exit" or (mission.objective == "clear-exit" and remaining == 0)
+      or (rescue and mission.carrying) then return "won" end
+    if not mission.exit_hint then
+      if rescue then game:message("FIND THE KITTEN FIRST")
+      elseif mission.objective == "clear-exit" then game:message("CLEAR THE AREA FIRST") end
+      mission.exit_hint = true
+    end
+  else
+    mission.exit_hint = nil
   end
 
   if squad.next_wave_at then

@@ -167,7 +167,7 @@ end
 function View:loading()
   self.canvas:rect(0,0,FIELD_W,FIELD_H,INK)
   self.strip:rect(0,0,W,HUD_H,INK)
-  text(self.canvas,"DUST RANGE",50,45,BRASS)
+  text(self.canvas,"DUSTPAW",59,45,BRASS)
 end
 
 function View:weapon_art(held)
@@ -268,6 +268,18 @@ local function draw_exit(c, exit, left, top, time, open)
   c:rect(x-7-pulse,y-7-pulse,2,15+2*pulse,color)
   c:rect(x+6+pulse,y-7-pulse,2,15+2*pulse,color)
   text(c,"EXIT",x-11,y-3,color)
+end
+
+local function draw_kitten(c, x, y, carried)
+  local kitten = require("art.kitten")
+  if x < -kitten.w or x >= FIELD_W+kitten.w or y < -kitten.h or y >= FIELD_H+kitten.h then return end
+  if not carried then
+    c:rect(x-5,y+3,11,2,SHADOW)
+    c:rect(x-6,y+4,13,1,SHADOW)
+    c:rect(x-9,y+1,2,1,HP_GREEN)
+    c:rect(x+8,y+1,2,1,HP_GREEN)
+  end
+  stamp(c,kitten.art,x-kitten.w//2,y-8,1,kitten.colors)
 end
 
 local function pickup_step(time)
@@ -814,7 +826,9 @@ local function hud(c, game)
   if game.drill then
     local squad = game.squad
     local status = game.practice and "PRACTICE" or "SOLDIER DRILL"
-    if game.mission and squad.total == 1 then status = string.format("%d LEFT", squad.remaining)
+    if game.mission and game.mission.objective == "rescue-kitten" then
+      status = game.result == "won" and "KITTEN SAFE" or game.mission.carrying and "REACH THE EXIT" or "FIND THE KITTEN"
+    elseif game.mission and squad.total == 1 then status = string.format("%d LEFT", squad.remaining)
       if game.mission.objective ~= "clear" then status = status .. "  FIND EXIT" end
     elseif squad and squad.total then status = string.format("WAVE %d/%d  %d LEFT", squad.wave, squad.total, squad.remaining)
     elseif squad then status = string.format("WAVE %d %d LEFT", squad.wave, squad.remaining) end
@@ -883,9 +897,13 @@ function View:draw(game)
     end
   end
   if game.cover then draw_cover(c,game.cover,left,top) end
+  local mission = game.mission
+  local rescue = mission and mission.objective == "rescue-kitten"
   if game.exit then
-    local mission = game.mission
     draw_exit(c,game.exit,left,top,game.time,mission.objective == "exit" or mission.exit_open)
+  end
+  if mission and mission.kitten and not mission.carrying then
+    draw_kitten(c,round(mission.kitten.x)-left,round(mission.kitten.y)-top)
   end
   for _, plate in ipairs(game.reflectors) do
     local x, y = round(plate.x)-left, round(plate.y)-top
@@ -924,6 +942,7 @@ function View:draw(game)
   local nearest_enemy = show_threats and draw_threats(c,game,left,top,false)
   if game.frost_speed then danger_ring(c,px,py+4,8,0xa4cad8) end
   self:draw_actor(game,game:held_weapon(),px,py)
+  if rescue and mission.carrying then draw_kitten(c,px+8,py+4,true) end
   for _, particle in ipairs(game.particles) do
     if max(particle.z or 0, particle.ez or 0) < roof_height and particle.kind ~= "smoke" and particle.kind ~= "exhaust" then
       draw_particle(c,particle,left,top,game)
@@ -971,6 +990,10 @@ function View:draw(game)
     health_bar(c,max(0,min(FIELD_W-19,px-9)),py < 14 and py+10 or py-14,19,4,ratio,health_color(game,ratio))
   end
   if closest then locator(c,closest,left,top,px,py,closest.kind == "medkit" and HP_GREEN or nil) end
+  if rescue and not game.result then
+    local goal = mission.carrying and game.exit or mission.kitten
+    if goal then locator(c,goal,left,top,px,py,0xf1a76e) end
+  end
   if game.hurt_until then
     local color = 0xb66050
     c:rect(0,0,FIELD_W,1,color)
@@ -979,18 +1002,16 @@ function View:draw(game)
     c:rect(FIELD_W-1,0,1,FIELD_H,color)
   end
   if game.result then
-    local cleared_trial = game.drill == "squad" and game.result == "won"
-    local y = cleared_trial and 26 or 31
-    c:rect(19,y,122,cleared_trial and 46 or 34,INK)
+    local y = 31
+    c:rect(19,y,122,34,INK)
     c:rect(19,y,122,1,BRASS)
     local result = "YOU ARE DOWN"
     if game.result == "won" then
-      result = game.mission and "LEVEL CLEAR" or game.squad and "TRIAL CLEARED"
-        or game.practice and "PRACTICE CLEARED" or "SOLDIER DOWN"
+      result = rescue and "KITTEN SAFE" or mission and "MISSION CLEAR" or game.practice and "PRACTICE CLEARED" or "SOLDIER DOWN"
     end
+    local action = mission and game.result == "won" and "SELECT MISSIONS" or "SELECT RETRY"
     text(c,result,80-3*#result,y+7,BRASS)
-    text(c,"SELECT RETRY",45,y+21,TEXT)
-    if cleared_trial then text(c,"RIGHT ENDLESS",41,y+34,TEXT) end
+    text(c,action,80-3*#action,y+21,TEXT)
   end
   local wave, remaining
   if game.squad then wave, remaining = game.squad.wave, game.squad.remaining end
@@ -998,13 +1019,15 @@ function View:draw(game)
   if self.game ~= game or self.weapon ~= game.weapon or self.found ~= game.found
     or self.hits ~= game.hits or self.notice ~= game.notice or self.health ~= game.health
     or self.wave ~= wave or self.remaining ~= remaining or self.hurt_until ~= game.hurt_until
-    or self.result ~= game.result or self.burning ~= burning or self.chilled ~= chilled then
+    or self.result ~= game.result or self.burning ~= burning or self.chilled ~= chilled
+    or self.carrying ~= (mission and mission.carrying) then
     hud(self.strip,game)
     self.game, self.health = game, game.health
     self.weapon, self.found, self.hits, self.notice = game.weapon, game.found, game.hits, game.notice
     self.wave, self.remaining = wave, remaining
     self.hurt_until = game.hurt_until
     self.result, self.burning, self.chilled = game.result, burning, chilled
+    self.carrying = mission and mission.carrying
   end
 end
 

@@ -9,7 +9,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "apps" / "dust-range"
-OUTPUT = ROOT / "dist" / "dust-range.zip"
+OUTPUT = ROOT / "dist" / "dustpaw.zip"
 PATH_COMPONENT = re.compile(r"[a-z0-9_-](?:[a-z0-9_.-]*[a-z0-9_-])?")
 
 
@@ -47,7 +47,7 @@ def build():
         pending.replace(OUTPUT)
 
     permissions = ", ".join(manifest.get("permissions", [])) or "none"
-    print(f"Dust Range {manifest['version']} | {len(bundled)}/64 bundled files | {size:,}/1,048,576 bytes")
+    print(f"{manifest['name']} {manifest['version']} | {len(bundled)}/64 bundled files | {size:,}/1,048,576 bytes")
     print(f"Permissions {permissions} | ZIP {OUTPUT.stat().st_size:,} bytes")
 
 

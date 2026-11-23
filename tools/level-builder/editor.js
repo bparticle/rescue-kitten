@@ -54,11 +54,12 @@ async function boot() {
   state.mats = materialMap(spec);
   state.layout = layout;
   state.heroLayout = heroLayout;
-  const [tileset, terrain, hero, ...weapons] = await Promise.all([
+  const [tileset, terrain, hero, kitten, ...weapons] = await Promise.all([
     loadImage('/assets/tileset.png'), loadImage('/assets/terrain.png'), loadImage('/assets/idle-hero.png'),
+    loadImage('/assets/entities/kitten.png'),
     ...WEAPON_ART.slice(1).map((name) => loadImage(`/assets/weapons/${name}.png`)),
   ]);
-  Object.assign(state.img, { tileset, terrain, hero, weapons: [null, ...weapons] });
+  Object.assign(state.img, { tileset, terrain, hero, kitten, weapons: [null, ...weapons] });
   buildUi();
   const list = await refreshLevelList();
   const last = localStorage.getItem('dust-range-level');
@@ -337,6 +338,14 @@ function drawEntity(entity) {
     } else if (icon) {
       vctx.drawImage(icon, x - Math.floor(icon.width / 2), y - 4 - Math.floor(icon.height / 2));
     }
+  } else if (entity.type === 'kitten') {
+    const kitten = state.img.kitten;
+    vctx.fillStyle = '#7b6b57';
+    vctx.fillRect(x - 6, y + 3, 13, 2);
+    vctx.fillStyle = '#b4cc92';
+    vctx.fillRect(x - 9, y + 1, 2, 1);
+    vctx.fillRect(x + 8, y + 1, 2, 1);
+    vctx.drawImage(kitten, x - Math.floor(kitten.width / 2), y - 8);
   } else if (entity.type === 'exit') {
     vctx.strokeStyle = '#ecd590';
     vctx.lineWidth = 2;
@@ -588,7 +597,7 @@ function placeEntity(px, py, free) {
   pushUndo();
   const type = state.entityType;
   let entity;
-  if (type === 'spawn' || type === 'exit') {
+  if (type === 'spawn' || type === 'exit' || type === 'kitten') {
     level.entities = level.entities.filter((e) => e.type !== type);
     entity = type === 'spawn' ? { type, x, y, dir: Number($('ent-dir').value) } : { type, x, y };
   } else if (type === 'enemy') {
@@ -1090,7 +1099,7 @@ function isDirty() {
 }
 
 function updateStatusDirty() {
-  document.title = `${isDirty() ? '• ' : ''}${state.level.name} – Dust Range Level Builder`;
+  document.title = `${isDirty() ? '• ' : ''}${state.level.name} – Dustpaw Level Builder`;
 }
 
 function setLevel(level, unsaved = false) {
@@ -1175,7 +1184,7 @@ async function exportLevel() {
 }
 
 async function buildZip() {
-  setStatus('Building dist/dust-range.zip…');
+  setStatus('Building dist/dustpaw.zip…');
   const result = await fetch('/api/package', { method: 'POST' }).then((r) => r.json());
   setStatus(result.ok ? 'ZIP built' : 'ZIP build failed', result.ok ? 'ok' : 'err');
   $('dialog-text').textContent = result.output || '(no output)';

@@ -253,14 +253,20 @@ try {
       "the windup locks the shot direction, and enemy fire cannot hit its shooter")
     advance(drill, 1800)
     assert(drill.health == 82 and drill.hits == 0, "the next handgun shot hits the player for 18")
+    local runner_ring = require("lib.enemies").profile("runner").standoff
     local check_runner = function(dodge)
       local game = Game.new(427, true)
       game.enemies, game.targets = {}, {}
-      local runner = game:spawn_enemy("runner", game.x+30, game.y, 7)
-      advance(game, 280)
+      local runner = game:spawn_enemy("runner", game.x+runner_ring, game.y, 7)
+      local waited = 0
+      while not runner.fire_at and waited < 900 do
+        advance(game, ${tick})
+        waited = waited + ${tick}
+      end
+      assert(waited >= 300, "the rush from the ring takes long enough to react")
       assert(runner.fire_at and runner.pose == 1, "the runner stops and marks its strike")
       if dodge then advance(game, 160, {up=true}) end
-      advance(game, 380)
+      advance(game, dodge and 360 or 520)
       assert(game.health == (dodge and 100 or 84) and game.hits == 0, "runner strikes have a dodge window")
     end
     check_runner(false)
@@ -427,46 +433,88 @@ try {
         and not game.burn and not game.frost_speed and not game.hurt_until)
     end
 
-    local medkits = Game.new(427, "squad")
+    local medkits = Game.new(427, "endless")
+    medkits.enemies = {}
+    medkits.targets = medkits.enemies
+    medkits.squad.next_wave_at = math.huge
+    medkits:add_medkit(medkits.x+20, medkits.y)
     local kit = medkits.pickups[1]
     medkits.x, medkits.y = kit.x-12, kit.y
     medkits.health = 40
     advance(medkits, ${tick}, {right=true})
     assert(medkits.health == 70 and medkits.notice == "MEDKIT  +30 HP")
-    assert(not medkits:pickup_visible(kit) and medkits.weapon == 1 and medkits.found == 0)
+    assert(not medkits:pickup_visible(kit) and medkits.weapon == 2 and medkits.found == 0)
 
-    local squad = Game.new(427, "squad")
-    assert(squad.squad.wave == 1 and #squad.enemies == 2 and #squad.targets == 2)
-    local soldier, runner = squad.enemies[1], squad.enemies[2]
+    local squad = Game.new(427, "endless")
+    for index = #squad.enemies, 1, -1 do squad.enemies[index] = nil end
+    local soldier = squad:spawn_enemy("soldier", squad.x+60, squad.y, 7)
+    local runner = squad:spawn_enemy("runner", squad.x-60, squad.y, 3)
+    squad.squad.next_attack_at = 0
     assert(squad:reserve_enemy_attack(soldier))
     assert(not squad:reserve_enemy_attack(runner), "a second attack cannot release on top of the first")
     squad.time = 0.5
     assert(squad:reserve_enemy_attack(runner), "the next attacker can reserve its own release window")
-    squad.health = 50
-    squad.burn = {weapon=Game.weapons[6], ticks=4, next_at=10}
-    squad.frost_until, squad.frost_speed = 10, 0.74
-    local supplies = {2, 3, 8, 8, 11, 11}
-    local a = squad.arena
+    squad.time, squad.squad.next_attack_at = 2, 0
+    assert(squad:reserve_enemy_attack(soldier))
+    squad.time = 2.3
+    assert(not squad:reserve_enemy_attack(runner, 0.4), "a rush waits until the pending attack goes off")
+    squad.time = 2.6
+    assert(squad:reserve_enemy_attack(runner, 0.4), "a rush can start once the previous attack released")
+    assert(squad.squad.next_attack_at > 2.6 + 0.4 + runner.profile.windup,
+      "a melee rush reserves its approach time as well as its windup")
+
+    -- Runners hold a ring around the player and only close in once they own an attack slot.
+    local ring = Game.new(427, "endless")
+    for index = #ring.enemies, 1, -1 do ring.enemies[index] = nil end
+    ring.squad.deployed = #ring.squad.roster
+    local first = ring:spawn_enemy("runner", ring.x+90, ring.y, 7)
+    local second = ring:spawn_enemy("runner", ring.x-90, ring.y, 3)
+    first.alerted, second.alerted = true, true
+    first.ready_at, second.ready_at = 10, 10
+    advance(ring, 1500)
+    for _, enemy in ipairs({first, second}) do
+      local d = math.sqrt((enemy.x-ring.x)^2 + (enemy.y-ring.y)^2)
+      assert(d >= first.profile.standoff-9 and d <= first.profile.standoff+3, "a waiting runner keeps its distance")
+    end
+    first.ready_at, second.ready_at = 0, 0
+    local closest, rushing = 1e9, 0
+    for _ = 1, 40 do
+      advance(ring, ${tick})
+      ring.health = 100
+      local both = 0
+      for _, enemy in ipairs({first, second}) do
+        closest = math.min(closest, math.sqrt((enemy.x-ring.x)^2 + (enemy.y-ring.y)^2))
+        if enemy.commit_until or enemy.fire_at then both = both + 1 end
+      end
+      rushing = math.max(rushing, both)
+    end
+    assert(closest <= first.profile.fire_range+1, "a runner with a slot closes in to strike")
+    assert(rushing == 1, "only one runner rushes at a time")
+
+    local wave = Game.new(427, "endless")
+    wave.health = 50
+    wave.burn = {weapon=Game.weapons[6], ticks=4, next_at=10}
+    wave.frost_until, wave.frost_speed = 10, 0.74
+    local a = wave.arena
     local spawn_checks = {{a.right,320}, {448,a.top}, {a.left,a.bottom}, {a.right,a.top}, {547,373}, {448,320}}
-    for wave = 1, squad.squad.total do
-      for _, enemy in ipairs(squad.enemies) do enemy.health = 0 end
-      advance(squad, 60)
-      if wave < squad.squad.total then
-        assert(squad.squad.remaining == 0 and #squad.targets == 0 and #squad.projectiles == 0)
-        assert(squad.health == math.min(100, 50 + 24*wave))
-        assert(not squad.burn and not squad.frost_speed, "wave recovery clears active status effects")
-        squad.x, squad.y = table.unpack(spawn_checks[wave])
-        local deadline = squad.time + 2
-        while squad.squad.wave == wave and squad.time < deadline do advance(squad, ${tick}) end
-        assert(squad.squad.wave == wave + 1 and #squad.targets == wave + 2)
-        assert(squad.weapon == supplies[wave])
-        for _, enemy in ipairs(squad.enemies) do
-          assert((enemy.x-squad.x)^2 + (enemy.y-squad.y)^2 >= 24^2-0.01, "spawns leave room around the player")
-          assert(enemy.x >= a.left and enemy.x <= a.right and enemy.y >= a.top and enemy.y <= a.bottom)
-        end
+    for index, spot in ipairs(spawn_checks) do
+      for _, enemy in ipairs(wave.enemies) do enemy.health = 0 end
+      wave.squad.deployed = #wave.squad.roster
+      advance(wave, 60)
+      assert(wave.squad.remaining == 0 and #wave.targets == 0 and #wave.projectiles == 0)
+      if index == 1 then
+        assert(wave.health == 74, "clearing a wave restores health")
+        assert(not wave.burn and not wave.frost_speed, "wave recovery clears active status effects")
+      end
+      wave.x, wave.y = table.unpack(spot)
+      local deadline = wave.time + 2
+      while wave.squad.wave == index and wave.time < deadline do advance(wave, ${tick}) end
+      assert(wave.squad.wave == index + 1 and #wave.enemies >= 1)
+      for _, enemy in ipairs(wave.enemies) do
+        assert((enemy.x-wave.x)^2 + (enemy.y-wave.y)^2 >= 46^2-0.01, "spawns leave room around the player")
+        assert(enemy.x >= a.left and enemy.x <= a.right and enemy.y >= a.top and enemy.y <= a.bottom)
       end
     end
-    assert(squad.result == "won", "the final wave completes the trial")
 
     local run, replay = Game.new(427, "endless"), Game.new(427, "endless")
     assert(run.weapon == 2 and run.owned[11] and run.squad.total == nil)
@@ -592,6 +640,10 @@ try {
   // Collect the isolated combat fixtures before sampling the app's live heap.
   badge.lua('return __gc()');
 
+  assert.equal(state().scene, 'briefing');
+  await badge.press('back');
+  await badge.press('up');
+  await badge.press('select');
   await badge.frames(10);
   assert.equal(state().weapon, 0);
   assert.equal(state().found, 0);
@@ -843,43 +895,29 @@ try {
   await badge.press('up');
   await badge.press('up');
   await badge.press('select');
-  assert.equal(state().mode, 'squad');
+  assert.equal(state().mode, 'endless', 'Endless Run is available without an unlock');
   assert.equal(state().wave, 1);
-  assert.equal(state().remaining, 2);
+  assert.ok(state().remaining >= 2);
+  assert.equal(state().weapon, 2);
   assert.equal(state().shots, 0);
-  if (preview) badge.screenshot(path.join(preview, 'dust-range-squad.png'));
-  for (let shot = 0; shot < 3; shot++) {
-    await badge.press('select');
-    await advance(180);
-  }
-  assert.equal(state().remaining, 1, 'the wave stays active after a single enemy is defeated');
-  await badge.press('left');
-  for (let shot = 0; shot < 2; shot++) {
-    await badge.press('select');
-    await advance(180);
-  }
-  assert.equal(state().remaining, 0);
-  assert.equal(state().weapon, 2, 'clearing wave one supplies the rifle');
-  await advance(1650);
-  assert.equal(state().wave, 2);
-  assert.equal(state().remaining, 3);
+  if (preview) badge.screenshot(path.join(preview, 'dust-range-endless.png'));
+  await advance(900);
   await badge.hold('back', Math.ceil(1240 / tick));
   assert.equal(state().scene, 'menu');
-  const pausedSquad = state();
+  const pausedRun = state();
   await advance(500);
-  assert.deepEqual(state(), pausedSquad, 'pause freezes the trial and its combat timers');
+  assert.deepEqual(state(), pausedRun, 'pause freezes the run and its combat timers');
   await badge.press('down');
   await badge.press('select');
-  assert.equal(state().mode, 'squad');
-  assert.equal(state().wave, 1, 'retry restarts the selected trial mode');
-  assert.equal(state().weapon, 1);
+  assert.equal(state().mode, 'endless');
+  assert.equal(state().wave, 1, 'retry restarts the selected mode');
   await badge.hold('back', Math.ceil(1240 / tick));
   await badge.press('down');
   await badge.press('down');
   await badge.press('select');
   assert.equal(state().mode, 'range');
   for (const field of ['x', 'y', 'weapon', 'found', 'hits', 'shots']) {
-    assert.equal(state()[field], savedRange[field], 'the trial preserves range progress');
+    assert.equal(state()[field], savedRange[field], 'the run preserves range progress');
   }
   await badge.hold('back', Math.ceil(1240 / tick));
   await badge.press('down');
@@ -909,14 +947,14 @@ try {
   await badge.hold('back', Math.ceil(1240 / tick));
   assert.equal(state().scene, 'menu');
   await badge.press('up');
-  assert.equal(state().choice, 6, "EXIT GAME follows the LEVELS entry");
+  assert.equal(state().choice, 6, "EXIT GAME follows the ENDLESS RUN entry");
   await badge.press('select', { after: 0 });
   assert.equal(badge.exited, true, 'Exit Game returns to the launcher');
   assert.ok(badge.leds.every(dark));
 
   assert.ok(peak < 110_000, `callback budget regressed: ${peak}`);
   assert.ok(peakObjects === 3, `expected two playfield canvases and one menu, saw ${peakObjects} objects`);
-  console.log(`Passed at ${tick} ms per tick. Checked the arsenal, controls, LEDs, menus, duel and Squad Trial.`);
+  console.log(`Passed at ${tick} ms per tick. Checked the arsenal, controls, LEDs, menus, duel, Endless Run and enemy spacing.`);
   console.log(`Headless peaks: ${Math.ceil(peak)} / 200000 instructions, ${Math.ceil(peakHeap)} KiB sampled Lua heap, ${peakObjects} UI objects.`);
 } finally {
   badge.close();

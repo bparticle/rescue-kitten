@@ -1,4 +1,4 @@
-// Checks level tiles, collision, destruction and the level menu with the sibling mosa-badge
+// Checks level tiles, collision, destruction and mission flow with the sibling mosa-badge
 // headless host. Run: node tools/levels-smoke.mjs [screenshot-dir]
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -90,6 +90,18 @@ assert.ok(validate({ ...roofFixture, entities: [{ ...roofFixture.entities[0], x:
 const mismatchedTerrain = { ...roofFixture, ground: ['mud:1', ...roofFixture.ground.slice(1)] };
 assert.ok(validate(mismatchedTerrain, materials).some((issue) => issue.message.includes('Invalid tile')));
 console.log('ok  builder validates roof footprints, enemy roles, map edges, and terrain indexes');
+
+const rescueFixture = newLevel('rescue-check', 10, 7);
+rescueFixture.objective = 'rescue-kitten';
+rescueFixture.loadout = [];
+assert.deepEqual(validate(rescueFixture, materials).map((issue) => issue.message),
+  ['This objective needs a kitten.', 'This objective needs an exit.']);
+rescueFixture.entities.push({ type: 'kitten', x: 88, y: 24 }, { type: 'exit', x: 120, y: 56 });
+assert.deepEqual(validate(rescueFixture, materials), []);
+assert.match(toLua(rescueFixture, materials), /\{"kitten",88,24\}/);
+assert.ok(validate({ ...rescueFixture, entities: [...rescueFixture.entities, { type: 'kitten', x: 24, y: 24 }] }, materials)
+  .some((issue) => issue.severity === 'error' && issue.message === 'Only one kitten is allowed.'));
+console.log('ok  builder validates and exports the kitten rescue objective');
 
 const badge = new SolanaOS({ dir: app });
 const readApp = badge.options.read;
@@ -340,8 +352,12 @@ check('enemies route around buildings', `local g = fresh()
   local runner = g:spawn_enemy("runner", centre(9), centre(1), 5)
   runner.alerted, runner.ready_at = true, 0
   g.x, g.y, g.health = centre(9), centre(13), 9999
-  run(g, 6000)
-  return tostring(runner.y > 11*16 and math.abs(runner.x - g.x) + math.abs(runner.y - g.y) < 40)`, 'true');
+  local reached = false
+  for _ = 1, 375 do
+    run(g, 16)
+    if runner.y > 11*16 and math.abs(runner.x - g.x) + math.abs(runner.y - g.y) < 40 then reached = true end
+  end
+  return tostring(reached)`, 'true');
 check('enemy fire hits the player in the open', `local g = fresh()
   for _, e in ipairs(g.enemies) do e.health = 0 end
   run(g, 50)
@@ -377,23 +393,46 @@ check('clearing waves opens the exit', `local g = fresh()
   return wave .. " " .. g.squad.wave .. " " .. tostring(g.result)`, '1 2 won');
 check('view draws a level frame', `local g = fresh(); local v = View.new(); v.canvas:show(false); v.strip:show(false); v:draw(g); g.x, g.y = centre(9), centre(6); v:draw(g); return "drawn"`, 'drawn');
 
-// Menu flow: hold Cancel to open the menu, pick LEVELS, start the first level.
-await badge.frames(30);
+// Startup briefing, rescue, extraction, and the next mission.
 const status = () => lua('return table.concat({range_status()}, ",")').split(',');
-await badge.hold('back', 90);
-await badge.frames(5);
-assert.equal(status()[9], 'menu');
-for (let i = 0; i < 3; i++) await badge.press('down');
-await badge.press('select');
-await badge.frames(3);
-assert.equal(status()[9], 'levels', `expected the level list, got ${status()[9]}`);
-if (shots) badge.screenshot(path.join(shots, 'levels-menu.png'));
-await badge.press('select');
-for (let i = 0; i < 120 && status()[12] !== 'level'; i++) await badge.frames(1);
+const position = () => status().slice(0, 2).map(Number);
+const walk = async (key, target) => {
+  const axis = key === 'left' || key === 'right' ? 0 : 1;
+  const sign = key === 'left' || key === 'up' ? -1 : 1;
+  for (let i = 0; i < 200 && sign * (target - position()[axis]) > 1; i++) await badge.hold(key, 1);
+  assert.ok(Math.abs(target - position()[axis]) < 2, `${key} to ${target}: ${position()}`);
+};
+await badge.frames(2);
+assert.equal(status()[9], 'briefing');
+if (shots) badge.screenshot(path.join(shots, 'mission-briefing.png'));
+await badge.hold('select', 36);
 assert.equal(status()[9], 'range');
 assert.equal(status()[12], 'level');
+assert.deepEqual(position(), [40, 120]);
+assert.equal(status()[5], '0', 'Select starts the mission without firing');
+await walk('down', 168);
+assert.equal(status()[14], 'active', 'the exit stays locked until the kitten is found');
+await walk('up', 136);
+await walk('right', 248);
+await walk('up', 72);
+if (shots) badge.screenshot(path.join(shots, 'mission-kitten.png'));
+await walk('right', 258);
+await walk('left', 248);
+await walk('down', 136);
+await walk('left', 40);
+await badge.hold('down', 24);
+assert.equal(status()[14], 'won', 'carrying the kitten to the exit completes the mission');
+if (shots) badge.screenshot(path.join(shots, 'mission-rescued.png'));
+await badge.press('select');
+assert.equal(status()[9], 'missions');
+if (shots) badge.screenshot(path.join(shots, 'missions-menu.png'));
+await badge.press('select');
+assert.equal(status()[9], 'briefing');
+await badge.press('select');
+await badge.frames(40);
+assert.deepEqual(position(), [24, 264]);
 if (shots) badge.screenshot(path.join(shots, 'level-start.png'));
-console.log('ok  level menu starts the level');
+console.log('ok  game opens on Rescue Kitten, requires extraction, then offers Outpost');
 // Walk into the crossroads firefight and keep shooting.
 for (let i = 0; i < 12; i++) { await badge.hold('right', 25); await badge.press('select'); }
 for (let i = 0; i < 6; i++) { await badge.hold('up', 15); await badge.press('select'); }

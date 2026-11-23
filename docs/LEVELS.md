@@ -1,6 +1,6 @@
 # Levels and tiles
 
-Dust Range levels are tile maps built with the local level builder and exported as Lua modules the badge loads from `apps/dust-range/levels/`. Tiles are 16 × 16 native pixels, drawn top down like the rest of the game.
+Dustpaw levels are tile maps built with the local level builder and exported as Lua modules the badge loads from `apps/dust-range/levels/`. Tiles are 16 × 16 native pixels, drawn top down like the rest of the game.
 
 ## Run the builder
 
@@ -8,14 +8,14 @@ Dust Range levels are tile maps built with the local level builder and exported 
 node tools/level-builder/server.mjs
 ```
 
-Open http://localhost:5178. Saved levels go to `levels/<id>.json`. **Export to badge** writes `apps/dust-range/levels/<id>.lua` and rebuilds `levels/index.lua`, which adds the level to the **LEVELS** entry in the pause menu. **Build ZIP** runs `tools/package.py`.
+Open http://localhost:5178. Saved levels go to `levels/<id>.json`. **Export to badge** writes `apps/dust-range/levels/<id>.lua` and rebuilds `levels/index.lua`, which adds the level to **Missions**. The first mission in menu order opens at launch. **Build ZIP** runs `tools/package.py`.
 
 | Key | Tool |
 | --- | --- |
 | B / R / F / E | Paint, rectangle (Shift for an outline), flood fill, erase |
 | I or Alt+click | Pick the tile under the cursor |
 | H | House: walls, floor, roof, a south doorway and optional wall openings in one drag |
-| N | Entities: player spawn, enemies (kind, facing, wave, surface), weapon pickups, medkits, exit |
+| N | Entities: player spawn, enemies (kind, facing, wave, surface), weapon pickups, medkits, kitten, exit |
 | Space or right-drag, wheel | Pan and zoom |
 | 1 / 2 / 3, [ / ] | Ground, structure and roof layer, brush size |
 | O / T / G | Cycle collision overlay, roof display, grid |
@@ -34,6 +34,10 @@ Other tools:
 - Paint a skylight, vent or ridge over any roof. Paint the roof material again to clear the detail, or erase the cell to cut a hole. Details hide with the rest of their roof when the player enters.
 - Paint narrow walls and cover cell by cell or use a one-tile rectangle outline. Adjacent ends connect automatically. Add an open doorway to make a walkway through a wall. Wall openings look like a sill between top-down jambs and let shots pass.
 - Paint a strip of road markings through asphalt or cracked asphalt. Connect the strip around bends and through junctions. Roads and paths preserve the dirt, grass or mud under their trimmed edges when painted over terrain. Rugs preserve the floor underneath.
+
+## Kitten rescue missions
+
+Set **Objective** to **Rescue kitten and carry it to the exit**. Place one **Kitten** and one **Exit** with the Entities tool, then export the level. The player picks up the kitten by walking up to it and completes the mission at the exit. Enemy waves are optional. Open `rescue-kitten` in the editor to see the bundled mission.
 
 ## Rooftop enemies
 
@@ -90,7 +94,7 @@ Every tile's behaviour comes from `sprites/tiles/materials.json`. The game, the 
 - [x] Enemies of all 12 kinds, with facing and wave number. The first wave holds position until it sees you or is hit. Later waves arrive hunting.
 - [x] Weapon pickups for all 15 weapons.
 - [x] Medkits that restore up to 30 HP when a wounded player walks over one.
-- [x] Objectives: clear every wave, reach the exit, or clear then exit.
+- [x] Objectives: clear every wave, reach the exit, clear then exit, or carry a kitten to the exit.
 - [x] Enemy pathfinding over the tile grid, eight ways without cutting corners.
 - [x] Walls shield actors and destructible tiles from blasts. Walls and roofs also block gravity and charged-shot splash across them.
 - [x] Builder checks for placement clearance, rooftop support, walking routes, objectives and nearby starting enemies.

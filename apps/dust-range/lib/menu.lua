@@ -8,28 +8,25 @@ local Menu = {}
 Menu.__index = Menu
 local range_options = {
   {"resume", "RESUME RANGE"}, {"specs", "WEAPON SPECS"},
-  {"drill", "SOLDIER DRILL"}, {"squad", "SQUAD TRIAL"}, {"exit", "EXIT GAME"},
+  {"drill", "SOLDIER DRILL"}, {"endless", "ENDLESS RUN"}, {"exit", "EXIT GAME"},
 }
-local unlocked_options = {
-  range_options[1], range_options[2], range_options[3], range_options[4],
-  {"endless", "ENDLESS RUN"}, range_options[5],
-}
-local levels_option = {"levels", "LEVELS"}
-local level_options, unlocked_level_options = {}, {}
+local level_options = {}
 for index, option in ipairs(range_options) do level_options[index] = option end
-for index, option in ipairs(unlocked_options) do unlocked_level_options[index] = option end
 -- After SOLDIER DRILL, so every other entry keeps its place counted from the top or bottom.
-table.insert(level_options, 4, levels_option)
-table.insert(unlocked_level_options, 4, levels_option)
+table.insert(level_options, 4, {"missions", "MISSIONS"})
 local drill_options = {
   {"resume", "RESUME DRILL"}, {"drill", "RETRY DRILL"},
   {"range", "BACK TO RANGE"}, {"exit", "EXIT GAME"},
 }
+local mission_options = {
+  {"resume", "RESUME"}, {"drill", "RETRY MISSION"}, {"missions", "MISSIONS"},
+  {"range", "TESTING RANGE"}, {"exit", "EXIT GAME"},
+}
 
-function Menu.options(drill, endless_unlocked, has_levels)
+function Menu.options(drill, has_levels)
+  if drill == "level" then return mission_options end
   if drill then return drill_options end
-  if has_levels then return endless_unlocked and unlocked_level_options or level_options end
-  return endless_unlocked and unlocked_options or range_options
+  return has_levels and level_options or range_options
 end
 
 local text, stamp = Pixels.text, Pixels.stamp
@@ -78,17 +75,18 @@ end
 
 local menu_rows = {[4]={32,26}, [5]={25,21}, [6]={22,18}, [7]={18,16}}
 
-function Menu:draw_pause(choice, game, hero, endless_unlocked, has_levels, pickup_motion)
+function Menu:draw_pause(choice, game, hero, has_levels, pickup_motion)
   local c = self.canvas
   frame(c, "UP/DOWN MOVE  SELECT OPEN", "CANCEL RESUME")
-  text(c,"DUST RANGE",14,19,BRASS,3)
-  local title = game.squad and "TRIAL PAUSED" or game.drill and "DRILL PAUSED" or "RANGE PAUSED"
+  text(c,"DUSTPAW",14,19,BRASS,3)
+  local title = game.drill and "DRILL PAUSED" or "RANGE PAUSED"
   if game.drill == "endless" then title = "ENDLESS PAUSED" end
+  if game.mission then title = "MISSION PAUSED" end
   if game.practice then title = "PRACTICE PAUSED" end
   right(c,title,306,29,DIM)
   c:rect(14,53,292,1,BORDER)
 
-  local options = Menu.options(game.drill, endless_unlocked, has_levels)
+  local options = Menu.options(game.drill, has_levels)
   local spacing, height = table.unpack(menu_rows[#options])
   for index, option in ipairs(options) do
     local y = 65 + (index-1)*spacing
@@ -273,34 +271,85 @@ function Menu:draw_enemy(page, count, entry, profile, art, colors)
   text(c,entry[3],23,178,TEXT)
 end
 
-local objectives = {clear="CLEAR ALL", exit="REACH EXIT", ["clear-exit"]="CLEAR + EXIT"}
+local objectives = {
+  clear={"CLEAR ALL", "DEFEAT EVERY WAVE"},
+  exit={"REACH EXIT", "MAKE IT TO THE EXIT"},
+  ["clear-exit"]={"CLEAR + EXIT", "DEFEAT EVERY WAVE", "THEN REACH THE EXIT"},
+  ["rescue-kitten"]={"RESCUE KITTEN", "WALK UP TO THE KITTEN", "CARRY IT TO THE EXIT"},
+}
 
--- Levels exported by tools/level-builder, listed from levels/index.lua.
-function Menu:draw_levels(choice, levels)
+function Menu:draw_briefing(level, index)
   local c = self.canvas
-  frame(c,"UP/DOWN CHOOSE  SELECT PLAY","CANCEL BACK")
-  text(c,"LEVELS",14,19,BRASS,3)
-  right(c,string.format("%02d/%02d",choice,#levels),306,29,DIM)
+  local goal = objectives[level.objective] or objectives.clear
+  local rescue = level.objective == "rescue-kitten"
+  frame(c,"SELECT START", "CANCEL MISSIONS")
+  if rescue and level.id == "rescue-kitten" then
+    local title = require("art.rescue-title")
+    c:rect(0,0,320,176,title.background)
+    stamp(c,title.left,0,0,2,title.colors)
+    stamp(c,title.right,160,0,2,title.colors)
+    c:rect(0,176,320,21,INK)
+    c:rect(0,176,320,1,BORDER)
+    text(c,goal[1],14,180,BRASS,2)
+    text(c,goal[2],181,179,TEXT)
+    text(c,goal[3],181,188,TEXT)
+    return
+  end
+
+  text(c,"DUSTPAW",18,18,DIM)
+  right(c,string.format("MISSION %02d",index),302,18,BRASS)
+  c:rect(18,34,284,1,BORDER)
+
+  local title = level.name:upper()
+  local scale = #title <= 15 and 3 or #title <= 23 and 2 or 1
+  text(c,title,18,52,BRASS,scale)
+  c:rect(18,89,284,91,PANEL)
+  c:rect(18,89,3,91,rescue and 0xb4cc92 or BRASS)
+  text(c,"OBJECTIVE",32,110,DIM)
+  text(c,goal[2],32,130,TEXT)
+  if goal[3] then text(c,goal[3],32,146,TEXT) end
+  if rescue then
+    local kitten = require("art.kitten")
+    c:rect(201,97,92,75,0x444738)
+    for x = 205, 289, 12 do c:rect(x,101,1,67,0x4f5342) end
+    for y = 107, 167, 12 do c:rect(205,y,85,1,0x4f5342) end
+    c:rect(220,153,52,8,0x35382d)
+    c:rect(228,150,36,14,0x35382d)
+    stamp(c,kitten.art,247-(kitten.w*4)//2,108,4,kitten.colors)
+  end
+end
+
+-- Exported levels are listed in mission order, followed by the testing range.
+function Menu:draw_missions(choice, levels)
+  local c = self.canvas
+  frame(c,"UP/DOWN CHOOSE  SELECT OPEN","CANCEL BACK")
+  text(c,"MISSIONS",14,19,BRASS,3)
   c:rect(14,53,292,1,BORDER)
   local visible = 7
-  local first = math.max(1, math.min(choice-3, #levels-visible+1))
+  local first = math.max(1, math.min(choice-3, #levels-visible+2))
   for row = 0, visible-1 do
     local index = first + row
     local level = levels[index]
-    if not level then break end
+    if index > #levels + 1 then break end
     local y = 62 + row*19
     local selected = index == choice
     c:rect(14,y,174,16,selected and BRASS or PANEL)
     c:rect(14,y,3,16,selected and 0xb5744e or BORDER)
-    text(c,level.name:upper():sub(1,26),24,y+5,selected and INK or TEXT)
+    text(c,level and level.name:upper():sub(1,26) or "TESTING RANGE",24,y+5,selected and INK or TEXT)
   end
   local level = levels[choice]
-  if not level then return end
   c:rect(198,62,108,128,BORDER)
   c:rect(199,63,106,126,PANEL)
+  if not level then
+    text(c,"FREE PRACTICE",205,70,BRASS)
+    text(c,"WEAPON SPECS",205,95,TEXT)
+    text(c,"SOLDIER DRILL",205,111,TEXT)
+    text(c,"ENDLESS RUN",205,127,TEXT)
+    return
+  end
   local rows = {
+    {"GOAL", (objectives[level.objective] or objectives.clear)[1]},
     {"SIZE", (level.w or 0) .. "X" .. (level.h or 0)},
-    {"GOAL", objectives[level.objective or "clear"] or "CLEAR ALL"},
     {"ENEMIES", tostring(level.enemies or 0)},
     {"WAVES", tostring(level.waves or 1)},
     {"HP", tostring(level.health or 100)},

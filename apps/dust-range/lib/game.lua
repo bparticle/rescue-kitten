@@ -103,7 +103,7 @@ function Game.new(seed, drill, surveyed_ground, practice)
   end
   if drill then
     game.owned[1] = true
-    if drill == "squad" or drill == "endless" then Squad.start(game, random(seed+801))
+    if drill == "endless" then Squad.start(game, random(seed+801))
     elseif practice then
       game.practice = practice
       game.owned[0], game.owned[2], game.owned[11], game.weapon = nil, true, true, 2
@@ -124,7 +124,7 @@ function Game:spawn_enemy(kind, x, y, direction, rooftop)
     enemy.roof = Level.region_at(self.level, x, y)
     self.rooftop_enemies = true
   end
-  if enemy.profile.strafe_speed then enemy.strafe_side = #self.enemies % 2 == 0 and 1 or -1 end
+  if enemy.profile.strafe_speed or enemy.profile.circle_speed then enemy.strafe_side = #self.enemies % 2 == 0 and 1 or -1 end
   self.enemies[#self.enemies+1] = enemy
   if self.targets ~= self.enemies then self.targets[#self.targets+1] = enemy end
   self.dirty = true

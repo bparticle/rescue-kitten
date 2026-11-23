@@ -128,7 +128,29 @@ def main():
     assert len(palette) + SYMBOL_START < 127, f'{len(palette)} colours overflow the packed index'
     colors = ','.join('0x%02x%02x%02x' % color for color in palette)
     write_module('palette', ['return {', f'  ground = 0x%02x%02x%02x,' % ground[:3], f'  colors = {{{colors}}},', '}'])
+    kitten = read_png(SPRITES / 'entities' / 'kitten.png')
+    kitten_palette = {}
+    art = pack(kitten, kitten_palette)
+    colors = ','.join('0x%02x%02x%02x' % color for color in kitten_palette)
+    write_module('kitten', ['return {', f'  w={kitten.width}, h={kitten.height},',
+                            f'  colors={{{colors}}},', f'  art={art},', '}'])
+    title_card()
     level_tiles()
+
+
+def title_card():
+    image = read_png(SPRITES / 'title' / 'rescue-kitten.png')
+    # The menu draws at 2x. Split the art so each x coordinate fits the packed format.
+    left, right = cells(image, 80, 88, 2, 1)[0]
+    assert image.getchannel('A').getextrema() == (255, 255)
+    background = image.getpixel((0, 0))
+    palette = {}
+    left_art = pack(left, palette, skip=background)
+    right_art = pack(right, palette, skip=background)
+    colors = ','.join('0x%02x%02x%02x' % color for color in palette)
+    write_module('rescue-title', ['return {', f'  background=0x%02x%02x%02x,' % background[:3],
+                                  f'  colors={{{colors}}},', f'  left={left_art},',
+                                  f'  right={right_art},', '}'])
 
 
 def lua_value(value):
