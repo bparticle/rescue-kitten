@@ -8,9 +8,11 @@ Open the [Solana OS app loader](https://solana.com/breakpoint/badge/apps/submit)
 
 Use Solana OS 2.0 or newer for the 6 MiB Lua heap. The app uses the LED permission. Solana OS 2.3 and later support its 16 ms tick request.
 
-Dustpaw has two modes: **Missions**, the main game, and the **Testing Range**. On your first launch, press **Select** on the title card to start Backyard or **Cancel** to open the **Mission Map**. Walk up to the kitten to pick it up, then carry it to the exit. After a successful rescue, press **Select** to return to the map. Completed missions are saved, and the map highlights the first unfinished mission when you return from a rescue or relaunch the game.
+Dustpaw has two modes: **Missions**, the main game, and the **Testing Range**. The game opens on the **Mission Map**. Only Backyard is open at first: each rescue unlocks the next mission, and cleared missions stay open to replay. Locked stops show a padlock and can be browsed but not opened. Select Backyard to see its title card, then press **Select** to start. Walk up to the kitten to pick it up, then carry it to the exit. After a successful rescue, press **Select** to return to the map. Cleared missions are saved on the device, and the map highlights the first unfinished mission when you return from a rescue or relaunch the game.
 
-On the map, press **Left/Right** to follow the route and **Select** to open any location's briefing. Press **Up** for the Testing Range. Both the map and the range are available from the mission pause menu.
+Weapons you pick up in a mission are saved as soon as you collect them, even if the rescue fails. Every later mission starts with its own loadout plus your saved weapons, and **Cancel** cycles through all of them. The Testing Range and Endless Run keep their own gear and don't add to your saved weapons.
+
+On the map, press **Left/Right** to follow the route and **Select** to open the briefing of any unlocked location. Press **Up** for the Testing Range. Both the map and the range are available from the mission pause menu.
 
 - **D-pad** moves the hero and sets the firing direction. Walk over a floating weapon to pick it up and equip it. When the nearest available pickup is at the edge of the screen or beyond it, the marker is amber for weapons and a green cross for medkits.
 - **Select** fires, throws, swings, or places the equipped item. Hold it for the rifle, flamethrower and cryo sprayer. Hold and release it to fire the charge cannon. The range has unlimited ammunition.
@@ -114,6 +116,7 @@ Each of the 15 weapons has a hero walk sheet (`sprites/hero/walk-<weapon>.png`) 
 - `python tools/draw_new_weapon_art.py` drew the first pass of the starter-arsenal hero sheets and effect sheets. It overwrites those PNGs, so run it only to start over. Edit the PNGs directly after that.
 - `node tools/smoke.mjs` checks the range, Endless Run, enemy practice, input, and LEDs with the sibling `mosa-badge` headless host at 16 ms per tick. It reports callback instructions, sampled Lua heap, and UI objects.
 - `node tools/bench.mjs` measures combat, startup and repeat retries. It estimates sideload file-read costs and compares the packed-run fallback with a model of the native RGB565 tile renderer. On the badge or official emulator, `lua mem` in the console reports the previous run's actual peaks after closing the app.
+- `node tools/love-check.mjs` checks that the [LÖVE version](hosts/love/README.md) still runs the current game. It runs both smoke suites on the LuaJIT translation and boots the game in LÖVE when LÖVE is installed.
 - Both tools accept `DUST_RANGE_TICK_MS=30` for the original cadence, `DUST_RANGE_APP_DIR` for an extracted release, and `MOSA_BADGE_DIR` for a different headless host checkout.
 
 Enemy profiles in `apps/dust-range/lib/enemies.lua` define health, hit radius, movement, weapons, and behavior. Range-keeping (`fire_range` and `retreat_range`), the melee standoff ring (`standoff`), and charge and support behavior live in `lib/ai/`. `lib/squad.lua` runs Endless Run waves, spawn spacing and the shared attack schedule, which staggers attack releases and lets only one melee rush start at a time. `lib/endless.lua` generates rosters from wave budgets and per-role limits with its own seeded random sequence. Levels use the same attack schedule.

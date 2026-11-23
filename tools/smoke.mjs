@@ -641,9 +641,7 @@ try {
   // Collect the isolated combat fixtures before sampling the app's live heap.
   badge.lua('return __gc()');
 
-  assert.equal(state().scene, 'briefing');
-  await badge.press('back');
-  assert.equal(state().scene, 'missions');
+  assert.equal(state().scene, 'missions', 'the game opens on the mission map');
   await badge.press('up');
   await badge.frames(10);
   assert.equal(state().weapon, 0);
@@ -959,7 +957,8 @@ try {
   assert.equal(badge.exited, true, 'Exit Game returns to the launcher');
   assert.ok(badge.leds.every(dark));
 
-  assert.ok(peak < 110_000, `callback budget regressed: ${peak}`);
+  // DUST_RANGE_BUDGET=off: tools/love-check.mjs runs translated code, which the badge never runs.
+  if (process.env.DUST_RANGE_BUDGET !== 'off') assert.ok(peak < 110_000, `callback budget regressed: ${peak}`);
   assert.ok(peakObjects === 3, `expected two playfield canvases and one menu, saw ${peakObjects} objects`);
   console.log(`Passed at ${tick} ms per tick. Checked the arsenal, controls, LEDs, menus, practice, Endless Run and enemy spacing.`);
   console.log(`Headless peaks: ${Math.ceil(peak)} / 200000 instructions, ${Math.ceil(peakHeap)} KiB sampled Lua heap, ${peakObjects} UI objects.`);

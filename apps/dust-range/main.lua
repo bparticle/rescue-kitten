@@ -20,7 +20,8 @@ local has_index, levels = pcall(require, "levels.index")
 if not has_index or type(levels) ~= "table" then levels = {} end
 local has_levels, level_choice = #levels > 0, 1
 local overworld = Overworld.new(levels, storage)
-local briefing_choice, active_mission, missions_back = 1, nil, "briefing"
+local briefing_choice, active_mission, missions_back = 1, nil, "start"
+local kept_found = 0
 screen:loading()
 if indicators then indicators:clear() end
 if sys.tick then sys.tick(16) end
@@ -39,7 +40,9 @@ local function resume_game()
 end
 
 local function start_game(kind, id)
-  game = Game.new(SEED, kind, not range.survey and range.ground or nil, id)
+  game = Game.new(SEED, kind, not range.survey and range.ground or nil, id,
+    kind == "level" and overworld.arsenal or nil)
+  kept_found = game.found
   if game.survey then screen:loading() end
   resume_game()
 end
@@ -61,13 +64,10 @@ local function open_range()
   resume_game()
 end
 
+-- Every launch opens on the map, focused on the first unfinished mission.
 if has_levels then
-  if overworld.count > 0 then
-    briefing_choice = overworld:next_mission() or #levels
-    show_missions("briefing", briefing_choice)
-  else
-    show_briefing(1)
-  end
+  briefing_choice = overworld:next_mission() or #levels
+  show_missions("start", briefing_choice)
 end
 
 local function retry()
@@ -81,7 +81,8 @@ local function navigate(key, repeated)
     if scene == "briefing" then
       show_missions(missions_back, briefing_choice)
     elseif scene == "missions" then
-      if missions_back == "briefing" then show_briefing(briefing_choice)
+      if missions_back == "start" then return
+      elseif missions_back == "briefing" then show_briefing(briefing_choice)
       elseif missions_back == "range" then resume_game()
       else scene, menu_dirty = "menu", true end
     elseif scene == "specs" then
@@ -101,7 +102,7 @@ local function navigate(key, repeated)
         level_choice, menu_dirty = next_choice, true
       end
     elseif key == "select" and not repeated then
-      show_briefing(level_choice)
+      if overworld:unlocked(level_choice) then show_briefing(level_choice) end
     elseif key == "up" and not repeated then
       open_range()
     end
@@ -190,7 +191,7 @@ function on_tick(ms)
         unfinished = menu:draw_briefing(levels[briefing_choice], briefing_choice, menu_dirty == "rest")
         if indicators then indicators:clear() end
       elseif scene == "missions" then
-        overworld:draw(menu.canvas, level_choice)
+        overworld:draw(menu.canvas, level_choice, missions_back ~= "start")
         if indicators then indicators:clear() end
       elseif scene == "specs" then
         if enemy_guide then
@@ -225,8 +226,13 @@ function on_tick(ms)
   end
   local active = not game.result
   game:update(ms, keys)
-  if active and game.mission and game.result == "won" then
-    overworld:complete(active_mission)
+  if game.mission then
+    -- Weapons found in a mission join the saved arsenal as soon as they are picked up.
+    if game.found ~= kept_found then
+      overworld:keep_weapons(game.found_ids, kept_found+1, game.found)
+      kept_found = game.found
+    end
+    if active and game.result == "won" then overworld:complete(active_mission) end
   end
   if indicators then indicators:update(game) end
   if game.dirty or screen:needs_pickup_frame(game) then

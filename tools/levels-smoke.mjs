@@ -580,7 +580,7 @@ check('kitten and time points are awarded at extraction and the final score free
   return lost.score
 `, 0);
 
-// Startup briefing, rescue, extraction, and the next mission.
+// The map opens first, only Backyard is open, then rescue, extraction, and the next mission.
 const status = () => lua('return table.concat({range_status()}, ",")').split(',');
 const position = () => status().slice(0, 2).map(Number);
 const walk = async (key, target) => {
@@ -590,8 +590,24 @@ const walk = async (key, target) => {
   assert.ok(Math.abs(target - position()[axis]) < 2, `${key} to ${target}: ${position()}`);
 };
 await badge.frames(2);
+assert.equal(status()[9], 'missions', 'a fresh launch opens the mission map');
+assert.equal(status()[19], '1', 'the map starts on Backyard');
+if (shots) badge.screenshot(path.join(shots, 'mission-map-first.png'));
+await badge.press('back');
+assert.equal(status()[9], 'missions', 'Cancel has nowhere to go from the launch map');
+await badge.press('right');
+assert.equal(status()[19], '2', 'locked stops can still be browsed');
+if (shots) badge.screenshot(path.join(shots, 'mission-map-locked.png'));
+await badge.press('select');
+assert.equal(status()[9], 'missions', 'Orchard stays locked until Backyard is cleared');
+await badge.press('left');
+await badge.press('select');
 assert.equal(status()[9], 'briefing');
 if (shots) badge.screenshot(path.join(shots, 'mission-briefing.png'));
+await badge.press('back');
+assert.equal(status()[9], 'missions', 'Cancel on the briefing returns to the map');
+await badge.press('select');
+assert.equal(status()[9], 'briefing');
 await badge.hold('select', 36);
 assert.equal(status()[9], 'range');
 assert.equal(status()[12], 'level');
@@ -620,7 +636,12 @@ assert.equal(status()[9], 'briefing');
 await badge.press('select');
 await badge.frames(40);
 assert.deepEqual(position(), [40, 120], 'the next mission is Orchard');
-console.log('ok  game opens on Backyard, requires extraction, then offers Orchard');
+assert.equal(status()[2], '1', 'Orchard starts with the handgun');
+await walk('right', 88);
+await walk('down', 168);
+assert.equal(status()[2], '2', 'walking over the assault rifle equips it');
+assert.deepEqual(JSON.parse(badge.storageJson()).arsenal, [2], 'the picked-up rifle is saved at once');
+console.log('ok  game opens on the map, Backyard unlocks Orchard, and found weapons are saved');
 
 // Follow the route in either direction, and leave for the range with Up.
 await badge.hold('back', Math.ceil(1240 / 16));
@@ -646,19 +667,47 @@ assert.equal(status()[9], 'missions');
 assert.equal(status()[19], '2', 'returning from the range focuses the next rescue');
 for (let i = 0; i < 7; i++) await badge.press('right');
 await badge.press('select');
-assert.equal(status()[9], 'briefing');
-if (shots) badge.screenshot(path.join(shots, 'outpost-briefing.png'));
-await badge.press('select');
-await badge.frames(40);
-assert.deepEqual(position(), [24, 264], 'mission 9 is Outpost');
-if (shots) badge.screenshot(path.join(shots, 'level-start.png'));
-// Walk into the crossroads firefight and keep shooting.
-for (let i = 0; i < 12; i++) { await badge.hold('right', 25); await badge.press('select'); }
-for (let i = 0; i < 6; i++) { await badge.hold('up', 15); await badge.press('select'); }
-if (shots) badge.screenshot(path.join(shots, 'level-fight.png'));
-assert.ok(peak < 160_000, `level callback budget regressed: ${peak}`);
-console.log(`ok  firefight within budget (${peak} / 200000 instructions)`);
+assert.equal(status()[9], 'missions', 'Outpost is locked');
+assert.equal(status()[19], '9');
 assert.deepEqual(badge.errors, []);
+
+// A veteran save: eight clears open Outpost, and the kept rifle joins its loadout.
+const veteranClears = Object.fromEntries(['backyard', 'orchard', 'farmhouse', 'crate-yard', 'riverside',
+  'hedge-maze', 'burning-barn', 'cold-storage'].map((id) => [id, true]));
+const veteran = new SolanaOS({ dir: app, storageJson: JSON.stringify({ mission_clears: veteranClears, arsenal: [2, 6] }) });
+await veteran.launch();
+installHeadlessClock(veteran, 16);
+const veteranCall = veteran.call.bind(veteran);
+veteran.call = (...args) => {
+  const result = veteranCall(...args);
+  peak = Math.max(peak, veteran.lastInstructions());
+  return result;
+};
+const veteranStatus = () => veteran.lua('return table.concat({range_status()}, ",")').split(',');
+await veteran.frames(1);
+assert.equal(veteranStatus()[19], '9', 'the map focuses the first unfinished mission');
+if (shots) veteran.screenshot(path.join(shots, 'mission-map-veteran.png'));
+await veteran.press('right');
+await veteran.press('select');
+assert.equal(veteranStatus()[9], 'missions', 'Fortress waits for Outpost');
+await veteran.press('left');
+await veteran.press('select');
+assert.equal(veteranStatus()[9], 'briefing');
+if (shots) veteran.screenshot(path.join(shots, 'outpost-briefing.png'));
+await veteran.press('select');
+await veteran.frames(40);
+assert.deepEqual(veteranStatus().slice(0, 2).map(Number), [24, 264], 'mission 9 is Outpost');
+const cycled = [veteranStatus()[2]];
+for (let i = 0; i < 3; i++) { await veteran.press('back'); await veteran.frames(2); cycled.push(veteranStatus()[2]); }
+assert.deepEqual(cycled, ['1', '2', '6', '1'], 'Cancel cycles through the loadout and the kept weapons');
+if (shots) veteran.screenshot(path.join(shots, 'level-start.png'));
+// Walk into the crossroads firefight and keep shooting.
+for (let i = 0; i < 12; i++) { await veteran.hold('right', 25); await veteran.press('select'); }
+for (let i = 0; i < 6; i++) { await veteran.hold('up', 15); await veteran.press('select'); }
+if (shots) veteran.screenshot(path.join(shots, 'level-fight.png'));
+if (process.env.DUST_RANGE_BUDGET !== 'off') assert.ok(peak < 160_000, `level callback budget regressed: ${peak}`);
+console.log(`ok  locked missions stay shut; kept weapons join Outpost's loadout; firefight within budget (${peak} / 200000 instructions)`);
+assert.deepEqual(veteran.errors, []);
 
 // Reopen with the badge's saved progress and an additional exported mission.
 const expanded = new SolanaOS({ dir: app, storage: badge.storageDump() });

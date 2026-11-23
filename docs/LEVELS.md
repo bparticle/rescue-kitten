@@ -10,7 +10,7 @@ node tools/level-builder/server.mjs
 
 Open http://localhost:5178. Saved levels go to `levels/<id>.json`. **Export to badge** writes `apps/dust-range/levels/<id>.lua` and rebuilds `levels/index.lua`, which adds the level to the **Mission Map**. Set **Menu order** to place it on the route. **Briefing** is an optional line shown on the mission's briefing screen. It wraps to two lines of 27 characters, and the badge font has letters, digits and `/ . % < > + -`. **Build ZIP** runs `tools/package.py`.
 
-Each map region holds up to ten locations. Further exports continue the same route onto the next region. New missions use a camp illustration by default. To give a mission its own landmark, add its level ID and drawing to `tools/draw_overworld.py` and run `python tools/draw_overworld.py` to regenerate the packed artwork. Completion is saved by level ID, so reordering missions keeps their cleared status.
+Each map region holds up to ten locations. Further exports continue the same route onto the next region. New missions use a camp illustration by default. To give a mission its own landmark, add its level ID and drawing to `tools/draw_overworld.py` and run `python tools/draw_overworld.py` to regenerate the packed artwork. Completion is saved by level ID, so reordering missions keeps their cleared status. A mission is open when it comes first, is cleared, or follows a cleared mission on the route.
 
 | Key | Tool |
 | --- | --- |

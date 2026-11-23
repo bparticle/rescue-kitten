@@ -77,7 +77,8 @@ local function terrain(cells, columns, rows, seed)
   end
 end
 
-function Game.new(seed, drill, surveyed_ground, practice)
+-- arsenal: weapon IDs kept from earlier missions ({[id]=true}); missions start with them in hand.
+function Game.new(seed, drill, surveyed_ground, practice, arsenal)
   local x, y = 448, 320
   local ground = surveyed_ground or {}
   local game = setmetatable({
@@ -86,13 +87,13 @@ function Game.new(seed, drill, surveyed_ground, practice)
     width=896, height=640, ground=ground, random=random(seed + 1),
     pickups=drill and {} or Range.pickups(x, y), targets=drill and {} or Range.targets(x, y),
     reflectors=drill and {} or Range.reflectors(x, y), enemies={}, bodies={}, dt=0,
-    owned={[0]=true}, projectiles={}, particles={}, scorch_marks={}, time=0, cooldown=0,
+    owned={[0]=true}, found_ids={}, projectiles={}, particles={}, scorch_marks={}, time=0, cooldown=0,
     score=(drill == "level" or drill == "endless") and 0 or nil,
     flash=0, message_until=0, dirty=true, drill=drill,
   }, Game)
   if drill == "level" then
     Level, Mission = require("lib.level"), require("lib.mission")
-    game.enemy_targets, game.level_id = {game}, practice
+    game.enemy_targets, game.level_id, game.arsenal = {game}, practice, arsenal
     game.survey = coroutine.create(function() Mission.start(game, practice) end)
     return game
   end
@@ -211,6 +212,7 @@ function Game:collect_weapon(id)
   if self.owned[id] then return end
   self.owned[id] = true
   self.found, self.weapon, self.flash, self.cooldown = self.found + 1, id, 0, 0
+  self.found_ids[self.found] = id
   self.charge_from = nil
   local weapon = Game.weapons[id]
   local name = weapon.name:upper()

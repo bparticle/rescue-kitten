@@ -17,7 +17,11 @@ function Mission.start(game, id)
   end
   game.owned = {}
   for _, id in ipairs(def.loadout or {}) do game.owned[id] = true end
-  game.weapon = (def.loadout or {})[1] or 0
+  -- Weapons kept from earlier missions join the loadout. Cancel cycles through all of them.
+  for id in pairs(game.arsenal or {}) do
+    if game.weapons[id] then game.owned[id] = true end
+  end
+  game.weapon = (def.loadout or {})[1] or next(game.owned) or 0
   if not next(game.owned) then game.owned[0] = true end
 
   local mission = {waves={}, name=def.name, objective=def.objective or "clear"}

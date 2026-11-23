@@ -20,7 +20,7 @@ local stops = {
 local MAP_Y = 22
 local INK, PANEL, EDGE = 0x262923, 0x34362d, 0x666b4e
 local TEXT, DIM, CREAM = 0xf6e9d0, 0xbeb095, 0xf1d592
-local GREEN, AMBER = 0xc7dc8c, 0xffc36d
+local GREEN, AMBER, LOCKED = 0xc7dc8c, 0xffc36d, 0x968d70
 local text = Pixels.text
 
 function Overworld.new(levels, store)
@@ -30,7 +30,15 @@ function Overworld.new(levels, store)
   for _, level in ipairs(levels) do
     if cleared[level.id] == true then count = count + 1 end
   end
-  return setmetatable({levels=levels, store=store, cleared=cleared, count=count}, Overworld)
+  -- Weapons picked up in missions, kept as a sorted list of weapon IDs.
+  local kept, arsenal = store and store.get("arsenal"), {}
+  if type(kept) == "table" then
+    for _, id in ipairs(kept) do
+      id = type(id) == "number" and math.tointeger(id)
+      if id and id > 0 then arsenal[id] = true end
+    end
+  end
+  return setmetatable({levels=levels, store=store, cleared=cleared, count=count, arsenal=arsenal}, Overworld)
 end
 
 function Overworld:complete(index)
@@ -41,10 +49,33 @@ function Overworld:complete(index)
   if self.store then pcall(self.store.set, "mission_clears", self.cleared) end
 end
 
+-- Adds weapons picked up in a mission (ids[first..last]) to the saved arsenal.
+function Overworld:keep_weapons(ids, first, last)
+  local added = false
+  for index = first, last do
+    local id = ids[index]
+    if id and id > 0 and not self.arsenal[id] then self.arsenal[id], added = true, true end
+  end
+  if added and self.store then
+    local list = {}
+    for id in pairs(self.arsenal) do list[#list+1] = id end
+    table.sort(list)
+    pcall(self.store.set, "arsenal", list)
+  end
+  return added
+end
+
 function Overworld:next_mission()
   for index, level in ipairs(self.levels) do
     if self.cleared[level.id] ~= true then return index end
   end
+end
+
+-- The first mission is always open. Each clear opens the one after it, and cleared missions stay open.
+function Overworld:unlocked(index)
+  local level, before = self.levels[index], self.levels[index-1]
+  if not level then return false end
+  return index == 1 or self.cleared[level.id] == true or self.cleared[before.id] == true
 end
 
 local function right(c, value, x, y, color)
@@ -84,8 +115,21 @@ local function marker(c, point, index, state, selected)
   c:rect(left+1,top+3,w,12,0x31362a)
   c:rect(left,top+1,w,11,INK)
   c:rect(left+2,top,w-4,13,INK)
-  c:rect(left+2,top+2,w-4,9,state == "CLEARED" and GREEN or state == "NEXT" and AMBER or CREAM)
+  c:rect(left+2,top+2,w-4,9,state == "CLEARED" and GREEN or state == "NEXT" and AMBER
+    or state == "LOCKED" and LOCKED or CREAM)
   text(c,label,x-#label*3+1,top+3,INK)
+  if state == "LOCKED" then
+    -- A small padlock on the marker's shoulder.
+    c:rect(x+7,top-9,7,1,INK)
+    c:rect(x+7,top-9,1,5,INK)
+    c:rect(x+13,top-9,1,5,INK)
+    c:rect(x+8,top-8,5,1,CREAM)
+    c:rect(x+8,top-8,1,4,CREAM)
+    c:rect(x+12,top-8,1,4,CREAM)
+    c:rect(x+6,top-4,9,7,INK)
+    c:rect(x+7,top-3,7,5,CREAM)
+    c:rect(x+10,top-2,1,2,INK)
+  end
   if state == "CLEARED" then
     c:line(x+7,top-2,x+9,top,INK)
     c:line(x+9,top,x+13,top-4,INK)
@@ -114,7 +158,7 @@ local function compass(c)
   c:line(x+2,y+1,x,y-4,CREAM)
 end
 
-function Overworld:draw(c, selected)
+function Overworld:draw(c, selected, can_back)
   local art = require("art.overworld")
   local region = (selected-1)//#stops
   local first = region*#stops+1
@@ -134,7 +178,8 @@ function Overworld:draw(c, selected)
     local walked = self.cleared[self.levels[first+slot-2].id] == true
       and self.cleared[self.levels[first+slot-1].id] == true
     trail(c,a,b,b[3],0x534b37,3)
-    trail(c,a,b,b[3],walked and 0xbac387 or leading and CREAM or 0xb7a374,2)
+    local open = self:unlocked(first+slot-1)
+    trail(c,a,b,b[3],walked and 0xbac387 or not open and 0x857a5c or leading and CREAM or 0xb7a374,2)
   end
   if region > 0 then
     trail(c,{0,65},stops[1],{{9,65}},0x534b37,3)
@@ -160,7 +205,8 @@ function Overworld:draw(c, selected)
     local x, y = position(point)
     local landmark = art.landmarks[level.id] or art.landmarks.camp
     Pixels.stamp(c,landmark,x-26,y-32,2,art.landmarks.colors)
-    local state = self.cleared[level.id] == true and "CLEARED" or index == next_mission and "NEXT" or "UNPLAYED"
+    local state = self.cleared[level.id] == true and "CLEARED" or not self:unlocked(index) and "LOCKED"
+      or index == next_mission and "NEXT" or "UNPLAYED"
     marker(c,point,index,state,index == selected)
     if index == selected then selected_state = state end
   end
@@ -179,14 +225,19 @@ function Overworld:draw(c, selected)
   local title = selected_level.name:upper()
   if #title <= 16 then text(c,title,39,183,TEXT,2)
   else text(c,title:sub(1,33),39,187,TEXT) end
-  local status_color = selected_state == "CLEARED" and GREEN or selected_state == "NEXT" and AMBER or DIM
+  local status_color = selected_state == "CLEARED" and GREEN or selected_state == "NEXT" and AMBER
+    or selected_state == "LOCKED" and LOCKED or DIM
   right(c,selected_state == "NEXT" and "NEXT STOP" or selected_state,311,187,status_color)
   c:rect(0,201,320,17,PANEL)
   c:rect(0,201,320,1,EDGE)
   text(c,"L/R ROUTE",8,207,CREAM)
   text(c,"UP RANGE",74,207,DIM)
-  text(c,"SELECT OPEN",135,207,TEXT)
-  right(c,"CANCEL BACK",311,207,DIM)
+  if selected_state == "LOCKED" then
+    text(c,string.format("CLEAR %02d FIRST",selected-1),135,207,LOCKED)
+  else
+    text(c,"SELECT OPEN",135,207,TEXT)
+  end
+  if can_back ~= false then right(c,"CANCEL BACK",311,207,DIM) end
 end
 
 return Overworld
