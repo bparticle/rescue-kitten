@@ -16,6 +16,7 @@ local HP_GREEN, HP_AMBER, HP_RED = 0xb4cc92, 0xe4bd75, 0xff9278
 local PICKUP_LIFT = {3,3,4,5,5,6,6,6,5,5,4,3}
 local MEDKIT_MID, MEDKIT_DARK = 0x8fa375, 0x40563d
 local BURGER_GOLD = 0xffc16a
+local STAR_NEW, STAR_EMPTY = 0xfff1b8, 0x5c5442
 local pickup_colors = {medkit=HP_GREEN, hamburger=BURGER_GOLD}
 local function skin(light, shade, dark, hood)
   return setmetatable({[6]=light, [8]=shade, [9]=dark, [22]=hood}, {__index=palette.colors})
@@ -237,8 +238,11 @@ local function draw_tile_art(self, c, tile, x, y)
 end
 
 local function draw_tile(self, c, tile, x, y)
-  if tile.footing then draw_tile_art(self, c, tile.footing, x, y) end
-  if tile.base then draw_tile_art(self, c, tile.base, x, y) end
+  -- An opaque tile hides whatever is underneath it.
+  if not tile.opaque then
+    if tile.footing then draw_tile_art(self, c, tile.footing, x, y) end
+    if tile.base then draw_tile_art(self, c, tile.base, x, y) end
+  end
   draw_tile_art(self, c, tile, x, y)
   if tile.detail then draw_tile_art(self, c, tile.detail, x, y) end
 end
@@ -274,9 +278,13 @@ local function draw_entrance(c, x, y, facing)
   end
 end
 
+-- Cells under an opaque tile in a later layer are skipped: structure covers ground, and a roof
+-- that is showing covers both. hidden is the roof region the player stands under, which isn't drawn.
 local function draw_level(self, c, level, left, top, layer, hidden, tall_only)
   local cells, w = level[layer], level.w
   local region = level.region
+  local walls = layer == "ground" and level.structure
+  local roofs = layer ~= "roof" and not tall_only and level.roof
   local entrances = layer == "roof" and level.entrances
   local x0, y0 = max(0, left//16), max(0, top//16)
   local x1, y1 = min(w-1, (left+FIELD_W-1)//16), min(level.h-1, (top+FIELD_H-1)//16)
@@ -285,7 +293,9 @@ local function draw_level(self, c, level, left, top, layer, hidden, tall_only)
     for x = x0, x1 do
       local i = row+x
       local tile = cells[i]
-      if tile and not (hidden and region[i] == hidden)
+      local covered = walls and walls[i] and walls[i].opaque
+        or roofs and roofs[i] and roofs[i].opaque and not (hidden and region[i] == hidden)
+      if tile and not covered and not ((layer == "roof" or tall_only) and hidden and region[i] == hidden)
         and (not tall_only or region[i] and (tile.def.height or 0) > level.roof_height) then
         local px = x*16-left
         draw_tile(self, c, tile, px, py)
@@ -817,34 +827,6 @@ local function draw_bodies(c, bodies, left, top, on_roof, hidden_roof)
   end
 end
 
-local function draw_arena(c, arena, left, top)
-  local x0, x1 = arena.left-left, arena.right-left
-  local y0, y1 = arena.top-top, arena.bottom-top
-  local x, y = max(0,x0), max(0,y0)
-  local width, height = min(FIELD_W-1,x1)-x+1, min(FIELD_H-1,y1)-y+1
-  local color = 0x94734d
-  if y0 >= 0 then c:rect(x,y0,width,2,color) end
-  if y1 < FIELD_H then c:rect(x,y1-1,width,2,color) end
-  if x0 >= 0 then c:rect(x0,y,2,height,color) end
-  if x1 < FIELD_W then c:rect(x1-1,y,2,height,color) end
-end
-
-local function draw_cover(c, blocks, left, top)
-  for _, block in ipairs(blocks) do
-    local x, y = block.left-left, block.top-top
-    local width, height = block.right-block.left+1, block.bottom-block.top+1
-    if x < FIELD_W and x+width > 0 and y < FIELD_H and y+height > 0 then
-      c:rect(x+2,y+2,width,height,SHADOW)
-      c:rect(x,y,width,height,INK)
-      c:rect(x+1,y+1,width-2,height-2,0x777567)
-      c:rect(x+2,y+2,width-4,2,0xa6a292)
-      c:rect(x+3,y+6,width-6,height-10,0x606154)
-      c:rect(x+width//2,y+6,1,height-10,0x45483e)
-      c:rect(x+2,y+height-5,width-4,2,0x898372)
-    end
-  end
-end
-
 local function danger_ring(c, x, y, radius, color)
   if x < -radius or x >= FIELD_W+radius or y < -radius or y >= FIELD_H+radius then return end
   for _, edge in ipairs(blast_ring) do
@@ -874,13 +856,6 @@ end
 
 local function draw_threats(c, game, left, top, roof_pass, hidden_roof)
   local nearest, distance = nil, math.huge
-  local incoming = not roof_pass and game.squad and game.squad.incoming
-  if incoming then
-    local x, y = round(incoming.x)-left, round(incoming.y)-top
-    danger_ring(c,x,y,8,0xe9ac69)
-    c:line(x-3,y,x+3,y,0xe9ac69)
-    c:line(x,y-3,x,y+3,0xe9ac69)
-  end
   for _, enemy in ipairs(game.enemies) do
     if enemy.health > 0 then
       local dx, dy = enemy.x-game.x, enemy.y-game.y
@@ -945,8 +920,7 @@ local function hud(c, game)
       status = game.result == "won" and "KITTEN SAFE" or game.mission.carrying and "REACH THE EXIT" or "FIND THE KITTEN"
     elseif game.mission and squad.total == 1 then status = string.format("%d LEFT", squad.remaining)
       if game.mission.objective ~= "clear" then status = status .. "  FIND EXIT" end
-    elseif squad and squad.total then status = string.format("WAVE %d/%d  %d LEFT", squad.wave, squad.total, squad.remaining)
-    elseif squad then status = string.format("WAVE %d %d LEFT", squad.wave, squad.remaining) end
+    elseif squad then status = string.format("WAVE %d/%d  %d LEFT", squad.wave, squad.total, squad.remaining) end
     text(c, status, 100, 4, TEXT)
     local condition, condition_color
     if game.burn and game.frost_speed then condition, condition_color = "BURN / CHILL", HP_AMBER
@@ -1005,15 +979,16 @@ function View:draw(game)
   local px, py = round(game.x)-left, round(game.y)-top
   local level = game.level
   local roof_height = level and level.roof_height or math.huge
+  local hidden_roof
   if level then
     level_tiles = level_tiles or require("art.tiles")
     if self.tile_images == nil then self.tile_images = (ui.load and c.image) and {} or false end
     if not self.tiles then c:rect(0,0,FIELD_W,FIELD_H,palette.ground) end
-    draw_level(self, c, level, left, top, "ground")
+    hidden_roof = level.region[floor(game.y/16)*level.w + floor(game.x/16) + 1]
+    draw_level(self, c, level, left, top, "ground", hidden_roof)
   else
     ground(c, game.ground, left, top, self.tiles)
   end
-  if game.arena then draw_arena(c,game.arena,left,top) end
   for _, mark in ipairs(game.scorch_marks) do
     local x, y = round(mark.x)-left, round(mark.y)-top
     if (mark.z or 0) < roof_height and x >= -17 and x < FIELD_W+17 and y >= -11 and y < FIELD_H+11 then
@@ -1021,8 +996,7 @@ function View:draw(game)
     end
   end
   draw_bodies(c,game.bodies,left,top,false)
-  if level then draw_level(self,c,level,left,top,"structure") end
-  if game.cover then draw_cover(c,game.cover,left,top) end
+  if level then draw_level(self,c,level,left,top,"structure",hidden_roof) end
   local mission = game.mission
   local rescue = mission and mission.objective == "rescue-kitten"
   if game.exit then
@@ -1085,10 +1059,7 @@ function View:draw(game)
     play(c,"charge-orb",1,frame,round(mx)-left,round(my)-top)
   end
   if game.flash > 0 then flash(c,game,left,top) end
-  local hidden_roof
   if level then
-    local under = floor(game.y/16)*level.w + floor(game.x/16) + 1
-    hidden_roof = level.region[under]
     draw_level(self,c,level,left,top,"roof",hidden_roof)
     if game.rooftop_enemies then
       for _, mark in ipairs(game.scorch_marks) do
@@ -1132,7 +1103,14 @@ function View:draw(game)
     c:rect(FIELD_W-1,0,1,FIELD_H,color)
   end
   if game.result then
+    local record = game.record
     local details = game.time_bonus and 22 or game.score and 11 or 0
+    local news
+    if record and record.best_score and record.best_time then news = "NEW BEST SCORE+TIME"
+    elseif record and record.best_score then news = "NEW BEST SCORE"
+    elseif record and record.best_time then news = "NEW BEST TIME" end
+    if game.stars then details = details + 11 end
+    if news then details = details + 11 end
     local y = game.practice and game.result == "won" and 4 or 31-details//2
     c:rect(19,y,122,34+details,INK)
     c:rect(19,y,122,1,BRASS)
@@ -1142,14 +1120,28 @@ function View:draw(game)
     end
     local action = mission and game.result == "won" and "SELECT MISSIONS" or "SELECT RETRY"
     text(c,result,80-3*#result,y+7,BRASS)
+    local line = y+18
     if game.score then
       local score = "SCORE " .. game.score
-      text(c,score,80-3*#score,y+18,TEXT)
+      text(c,score,80-3*#score,line,TEXT)
+      line = line + 11
     end
     if game.time_bonus then
-      local bonus = "TIME BONUS +" .. game.time_bonus
-      text(c,bonus,80-3*#bonus,y+29,BURGER_GOLD)
+      local bonus = game.clear_time .. "S  BONUS +" .. game.time_bonus
+      text(c,bonus,80-3*#bonus,line,BURGER_GOLD)
+      line = line + 11
     end
+    if game.stars then
+      -- Stars earned for the first time on this run shine brighter.
+      local gained = record and record.gained or 0
+      for slot = 0, 2 do
+        local bit = 1 << slot
+        local color = game.stars & bit == 0 and STAR_EMPTY or gained & bit ~= 0 and STAR_NEW or BURGER_GOLD
+        Pixels.star(c,65+slot*12,line,color)
+      end
+      line = line + 11
+    end
+    if news then text(c,news,80-3*#news,line,STAR_NEW) end
     text(c,action,80-3*#action,y+21+details,TEXT)
   end
   local wave, remaining

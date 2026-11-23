@@ -35,9 +35,26 @@ def rectangles(image, skip):
         yield x, top, width, image.height - top, color
 
 
-def pack(image, palette, skip=None):
+def filled_runs(image, skip):
+    """Fewest rectangles for a tile: plain runs, or for an opaque tile one fill in a common
+    colour followed by the runs of every other colour. Both draw the same pixels."""
+    best = list(rectangles(image, skip))
+    alpha = set(image.getchannel('A').get_flattened_data())
+    if alpha != {255}:
+        return best
+    counts = {}
+    for color in image.get_flattened_data():
+        counts[color] = counts.get(color, 0) + 1
+    for color in sorted(counts, key=counts.get, reverse=True)[:3]:
+        runs = [(0, 0, image.width, image.height, color[:3])] + list(rectangles(image, color))
+        if len(runs) < len(best):
+            best = runs
+    return best
+
+
+def pack(image, palette, skip=None, fill=False):
     stream = []
-    for x, y, width, height, color in rectangles(image, skip):
+    for x, y, width, height, color in (filled_runs(image, skip) if fill else rectangles(image, skip)):
         index = palette.setdefault(color, len(palette) + 1)
         stream.extend(chr(value + SYMBOL_START) for value in (x, y, width, height, index))
     data = ''.join(stream)
@@ -123,7 +140,7 @@ def main():
         for tile in row:
             images = [tile] + [tile.transpose(rotate) for rotate in (
                 Image.Transpose.ROTATE_90, Image.Transpose.ROTATE_180, Image.Transpose.ROTATE_270)]
-            lines.extend('  ' + pack(image, palette, skip=ground) + ',' for image in images)
+            lines.extend('  ' + pack(image, palette, skip=ground, fill=True) + ',' for image in images)
     write_module('terrain', [*lines, '}'])
     assert len(palette) + SYMBOL_START < 127, f'{len(palette)} colours overflow the packed index'
     colors = ','.join('0x%02x%02x%02x' % color for color in palette)
@@ -214,7 +231,7 @@ def level_tiles():
             image = sheet.crop((col * size, row * size, (col + 1) * size, (row + 1) * size))
             alpha = set(image.getchannel('A').get_flattened_data())
             assert alpha <= {0, 255}, f'{mid} has semi-transparent pixels'
-            packed.append(pack(image, palette))
+            packed.append(pack(image, palette, fill=True))
             flags += '1' if alpha == {255} else '0'
         art.append(f'    [{json.dumps(mid)}] = {{{",".join(packed)}}},')
         opaque.append(f'    [{json.dumps(mid)}] = "{flags}",')

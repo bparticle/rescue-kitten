@@ -14,7 +14,7 @@ local menu = Menu.new()
 local indicators = Indicators.new()
 local MENU_HOLD_MS = 1200
 local scene, choice, page = "range", 1, 1
-local enemy_page, enemy_guide = 1, false
+local enemy_page, enemy_guide, specs_back = 1, false, "menu"
 local cancel_pressed_at, resume_keys, menu_dirty
 local has_index, levels = pcall(require, "levels.index")
 if not has_index or type(levels) ~= "table" then levels = {} end
@@ -86,7 +86,7 @@ local function navigate(key, repeated)
       elseif missions_back == "range" then resume_game()
       else scene, menu_dirty = "menu", true end
     elseif scene == "specs" then
-      scene, menu_dirty = "menu", true
+      scene, menu_dirty = specs_back, true
     else
       resume_game()
     end
@@ -105,6 +105,8 @@ local function navigate(key, repeated)
       if overworld:unlocked(level_choice) then show_briefing(level_choice) end
     elseif key == "up" and not repeated then
       open_range()
+    elseif key == "down" and not repeated then
+      scene, enemy_guide, specs_back, menu_dirty = "specs", false, "missions", true
     end
   elseif scene == "menu" then
     local options = Menu.options(game.drill, has_levels)
@@ -118,13 +120,12 @@ local function navigate(key, repeated)
     elseif key == "select" and not repeated then
       local action = options[choice][1]
       if action == "resume" then resume_game()
-      elseif action == "specs" then scene, enemy_guide, menu_dirty = "specs", false, true
+      elseif action == "specs" then scene, enemy_guide, specs_back, menu_dirty = "specs", false, "menu", true
       elseif action == "drill" then
         if game.mission then missions_back = "menu" end
         retry()
       elseif action == "missions" then
         show_missions("menu", game.mission and active_mission or overworld:next_mission() or #levels)
-      elseif action == "endless" then start_game("endless")
       elseif action == "range" then open_range()
       else sys.exit() end
     end
@@ -188,10 +189,12 @@ function on_tick(ms)
     if menu_dirty then
       local unfinished = false
       if scene == "briefing" then
-        unfinished = menu:draw_briefing(levels[briefing_choice], briefing_choice, menu_dirty == "rest")
+        local level = levels[briefing_choice]
+        unfinished = menu:draw_briefing(level, briefing_choice, menu_dirty == "rest",
+          overworld.records[level.id], overworld:stars(briefing_choice))
         if indicators then indicators:clear() end
       elseif scene == "missions" then
-        overworld:draw(menu.canvas, level_choice, missions_back ~= "start")
+        overworld:draw(menu.canvas, level_choice)
         if indicators then indicators:clear() end
       elseif scene == "specs" then
         if enemy_guide then
@@ -232,7 +235,11 @@ function on_tick(ms)
       overworld:keep_weapons(game.found_ids, kept_found+1, game.found)
       kept_found = game.found
     end
-    if active and game.result == "won" then overworld:complete(active_mission) end
+    if active and game.result == "won" then
+      -- Record before marking the clear, so a first clear reports its star as newly earned.
+      game.record = overworld:record(active_mission, game.score, game.clear_time, game.stars)
+      overworld:complete(active_mission)
+    end
   end
   if indicators then indicators:update(game) end
   if game.dirty or screen:needs_pickup_frame(game) then

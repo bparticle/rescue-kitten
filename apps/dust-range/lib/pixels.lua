@@ -43,6 +43,12 @@ function Pixels.stamp(c, data, x, y, scale, colors)
   end
 end
 
+-- A 7 by 7 star: {row, first column, width} for each run.
+local star = {{0,3,1},{1,3,1},{2,0,7},{3,1,5},{4,2,3},{5,1,2},{5,4,2},{6,0,2},{6,5,2}}
+function Pixels.star(c, x, y, color)
+  for _, run in ipairs(star) do c:rect(x+run[2], y+run[1], run[3], 1, color) end
+end
+
 function Pixels.text(c, value, x, y, color, scale)
   for index = 1, #value do
     local glyph = letters[value:sub(index,index)]

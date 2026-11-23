@@ -24,7 +24,7 @@ function Mission.start(game, id)
   game.weapon = (def.loadout or {})[1] or next(game.owned) or 0
   if not next(game.owned) then game.owned[0] = true end
 
-  local mission = {waves={}, name=def.name, objective=def.objective or "clear"}
+  local mission = {waves={}, name=def.name, objective=def.objective or "clear", par=def.par}
   game.mission = mission
   local total = 0
   for _, entity in ipairs(def.entities or {}) do
@@ -97,10 +97,31 @@ local function in_reach(game, point)
   return dx*dx + dy*dy <= INTERACT_RADIUS^2 and not game:cover_entry(game.x,game.y,dx,dy,1,0,"walk")
 end
 
+-- Stars are bits: 1 for completing the mission, 2 for finishing within par time,
+-- 4 for losing at most a quarter of the starting health.
+Mission.STAR_CLEAR, Mission.STAR_PAR, Mission.STAR_HEALTH = 1, 2, 4
+
+function Mission.damage_limit(health)
+  return (health or 100)//4
+end
+
+function Mission.stars(par, health, seconds, damage)
+  local stars = Mission.STAR_CLEAR
+  if par and seconds <= par then stars = stars | Mission.STAR_PAR end
+  if damage <= Mission.damage_limit(health) then stars = stars | Mission.STAR_HEALTH end
+  return stars
+end
+
+-- The full time bonus holds until par, then drops by 10 per second.
 local function complete(game)
-  if game.mission.objective == "rescue-kitten" then game:add_score(RESCUE_POINTS) end
-  game.time_bonus = math.max(0, TIME_BONUS_MAX - math.floor(game.time + 1e-9)*TIME_BONUS_PER_SECOND)
+  local mission = game.mission
+  if mission.objective == "rescue-kitten" then game:add_score(RESCUE_POINTS) end
+  local seconds = math.floor(game.time + 1e-9)
+  local late = math.max(0, seconds - (mission.par or 0))
+  game.time_bonus = math.max(0, TIME_BONUS_MAX - late*TIME_BONUS_PER_SECOND)
   game.score = game.score + game.time_bonus
+  game.clear_time = seconds
+  game.stars = Mission.stars(mission.par, game.surface.health, seconds, game.damage_taken or 0)
   return "won"
 end
 

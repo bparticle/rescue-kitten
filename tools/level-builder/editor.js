@@ -954,6 +954,11 @@ function buildUi() {
     state.level.health = Math.max(10, Math.min(999, Math.round(Number(v)) || 100));
     $('lvl-health').value = state.level.health;
   });
+  field('lvl-par', (v) => {
+    const par = Math.round(Number(v));
+    if (par >= 1) state.level.par = Math.min(3599, par); else delete state.level.par;
+    $('lvl-par').value = state.level.par || '';
+  });
   field('lvl-order', (v) => { state.level.order = Number(v) || 0; });
   field('lvl-seed', (v) => { state.level.seed = Number(v) || 1; });
   $('lvl-loadout').addEventListener('change', () => {
@@ -1027,6 +1032,7 @@ function syncLevelForm() {
   $('lvl-objective').value = l.objective || 'clear';
   $('lvl-brief').value = l.brief || '';
   $('lvl-health').value = l.health || 100;
+  $('lvl-par').value = l.par || '';
   $('lvl-order').value = l.order || 0;
   $('lvl-w').value = l.width;
   $('lvl-h').value = l.height;

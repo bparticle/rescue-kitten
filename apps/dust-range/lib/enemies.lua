@@ -70,13 +70,13 @@ local profiles = {
     surface={name="MARKSMAN", health=40, radius=7, scale={}, light=true},
   },
   cinder = {
-    behavior=Ranged.update, skin="cinder", weapon=6, speed=61, drop=6,
+    behavior=Ranged.update, skin="cinder", weapon=6, speed=61,
     notice_range=120, fire_range=33, retreat_range=24, windup=0.59, recovery=1.28,
     shot=enemy_shot(6, {damage=2, life=0.23, burn_damage=3, burn_ticks=3, burn_interval=0.28}),
     surface={name="CINDER", health=58, radius=8, scale={heat=0.55, burn=0.55}},
   },
   cryo = {
-    behavior=Ranged.update, skin="cryo", weapon=12, speed=67, drop=12,
+    behavior=Ranged.update, skin="cryo", weapon=12, speed=67,
     notice_range=120, fire_range=33, retreat_range=24, windup=0.68, recovery=1.38,
     shot=enemy_shot(12, {damage=1, life=0.25, frost_time=1.28, frost_speed=0.74, shatter=10}),
     surface={name="CRYO TECH", health=47, radius=8, scale={frost=0.5}, light=true},

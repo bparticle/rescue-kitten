@@ -11,7 +11,7 @@ const materials = materialMap(JSON.parse(fs.readFileSync(path.join(root, 'sprite
 const W = 48, H = 32;
 const level = newLevel('outpost', W, H, 911);
 Object.assign(level, {
-  name: 'Outpost', objective: 'rescue-kitten', health: 130, loadout: [1, 2], order: 9,
+  name: 'Outpost', objective: 'rescue-kitten', health: 130, loadout: [1, 2], order: 9, par: 80,
   brief: 'THE KITTEN CRAWLED INTO THE BARN ACROSS THE RIVER.',
 });
 

@@ -52,7 +52,10 @@ function installImages(badge, images) {
 }
 
 async function measure(native) {
-  const badge = new SolanaOS({ dir: app });
+  // Nine clears open the Fortress, the busiest mission: three waves and rooftop marksmen.
+  const clears = Object.fromEntries(['backyard', 'orchard', 'farmhouse', 'crate-yard', 'riverside',
+    'hedge-maze', 'burning-barn', 'cold-storage', 'outpost'].map((id) => [id, true]));
+  const badge = new SolanaOS({ dir: app, storageJson: JSON.stringify({ mission_clears: clears }) });
   const wait = (ms) => badge.frames(Math.ceil(ms / tick));
   const images = [];
   let readCost = 0;
@@ -71,14 +74,11 @@ async function measure(native) {
       function bench_wound_pair()
         for index = 1, 2 do game:damage(game.enemies[index], 24, "impact") end
       end
-      function bench_clear_wave()
-        game.result, game.health = nil, game.surface.health
-        game.squad.deployed = #game.squad.roster
-        for _, enemy in ipairs(game.enemies) do enemy.health = 0 end
+      function bench_ready() return game.survey == nil end
+      function bench_wake_all()
+        game.health = game.surface.health
+        for _, enemy in ipairs(game.enemies) do enemy.dormant, enemy.alerted = nil, true end
       end
-      function bench_late_endless_wave() game.squad.wave = 14 end
-      function bench_drop_one_enemy() game.enemies[1].health = 0 end
-      function bench_reinforcement_is_marked() return game.squad.incoming ~= nil end
       function bench_active_enemies() return #game.enemies end
     `;
   };
@@ -110,7 +110,7 @@ async function measure(native) {
         peakStage = combatStage;
         peakCombatReads = readCost;
       }
-      if (combatStage === 'Endless while moving' && args[0] === 'on_tick') {
+      if (combatStage === 'Fortress while moving' && args[0] === 'on_tick') {
         movingCost += cost;
         movingTicks++;
       }
@@ -126,61 +126,59 @@ async function measure(native) {
     assert.equal(images.length, native ? 48 : 0);
     const frame = () => createHash('sha256').update(badge.rgba()).digest('hex');
     const rangeFrame = frame();
-    await badge.hold('back', Math.ceil(1240 / tick));
-    await badge.press('up');
-    await badge.press('up');
-    await badge.press('select');
-    assert.equal(badge.lua('return select(13, range_status())'), 'endless');
-    combatStage = 'Endless opening waves';
-
-    // Play the start of each early wave, then jump to the next to reach a busy live group.
     const wave = () => badge.lua('return select(16, range_status())');
-    assert.equal(wave(), 1);
-    while (wave() < 7) {
-      await wait(800);
-      badge.lua('bench_clear_wave()');
-      const previous = wave();
-      await wait(1700);
-      assert.equal(wave(), previous + 1);
+    async function startFortress() {
+      for (let attempt = 0; attempt < 200 && !badge.lua('return bench_ready()'); attempt++) await badge.frames(1);
+      assert.equal(badge.lua('return select(13, range_status())'), 'level');
+      assert.equal(badge.lua('return bench_ready()'), true, 'the Fortress finished loading');
+      assert.equal(wave(), 1);
     }
+    // Range menu: Resume, Mission Map, Weapon Specs, Exit. The map focuses the Fortress.
+    await badge.hold('back', Math.ceil(1240 / tick));
+    await badge.press('down');
+    await badge.press('select');
+    assert.equal(Number(badge.lua('return select(20, range_status())')), 10);
+    await badge.press('select');
+    await badge.press('select');
+    await startFortress();
+    combatStage = 'Fortress opening wave';
+    badge.lua('bench_wake_all()');
+    await wait(2500);
     badge.lua('bench_wound_pair()');
     await wait(900);
     const openingFrame = frame();
     await badge.press('select');
-    await wait(3500);
+    await wait(2500);
     combatStage = null;
 
-    combatStage = 'Endless Run';
-    badge.lua('bench_late_endless_wave(); bench_clear_wave()');
-    await wait(1730);
-    assert.equal(wave(), 15);
-    const remaining = () => badge.lua('return select(17, range_status())');
-    const active = () => badge.lua('return bench_active_enemies()');
-    const total = remaining();
-    assert.ok(total > 8 && total <= 14 && active() === 8);
-    badge.lua('bench_drop_one_enemy()');
-    await badge.frames(1);
-    assert.equal(remaining(), total - 1);
-    assert.equal(active(), 7);
-    assert.equal(badge.lua('return bench_reinforcement_is_marked()'), true);
-    const reinforcementFrame = frame();
+    // Clear each wave to reach the final assault with every remaining enemy hunting.
+    combatStage = 'Fortress later waves';
+    while (wave() < 3) {
+      const previous = wave();
+      badge.lua('bench_finish_wave(true)');
+      await wait(1800);
+      assert.equal(wave(), previous + 1);
+      badge.lua('bench_wake_all()');
+      await wait(1500);
+    }
+    assert.ok(badge.lua('return bench_active_enemies()') > 0);
+    const lateFrame = frame();
     if (preview && native) badge.screenshot(preview);
-    for (let attempt = 0; attempt < 20 && active() < 8; attempt++) await wait(90);
-    assert.equal(active(), 8, 'a queued enemy took the defeated enemy’s slot');
-    combatStage = 'Endless while moving';
+    combatStage = 'Fortress while moving';
+    badge.lua('bench_wake_all()');
     await badge.hold('left', Math.ceil(320 / tick));
     await badge.hold('up', Math.ceil(320 / tick));
     await badge.press('select');
     await wait(460);
     combatStage = null;
 
-    // Restart Endless Run through the normal pause-menu action.
+    // Mission menu: Resume, Retry Mission. Retry opens the briefing, and Select starts again.
     async function retry() {
       await badge.hold('back', Math.ceil(1240 / tick));
       await badge.press('down');
       await badge.press('select');
-      await wait(640);
-      assert.equal(wave(), 1);
+      await badge.press('select');
+      await startFortress();
     }
     await retry();
     const retained = gc();
@@ -196,7 +194,7 @@ async function measure(native) {
     assert.ok(peakHeap + imageKiB < 4 * 1024, 'keep at least 2 MiB of badge heap headroom in the model');
     assert.ok(retainedGrowth < 24, `trial restarts retained ${retainedGrowth.toFixed(1)} KiB`);
     assert.equal(peakObjects, 3);
-    return { rangeFrame, openingFrame, reinforcementFrame, save: badge.storageJson() };
+    return { rangeFrame, openingFrame, lateFrame, save: badge.storageJson() };
   } finally {
     badge.close();
   }

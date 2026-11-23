@@ -74,7 +74,7 @@ const levels = {};
 // 1. One guard, the kitten in plain sight, and the exit right behind you.
 levels.backyard = () => {
   const L = draft('backyard', 18, 10, 101, {
-    name: 'Backyard', objective: 'rescue-kitten', health: 100, loadout: [HANDGUN], order: 1,
+    name: 'Backyard', objective: 'rescue-kitten', health: 100, loadout: [HANDGUN], order: 1, par: 20,
     brief: 'A KITTEN WANDERED INTO THE YARD. ONE GUARD.',
   });
   L.terrain(0, 0, 17, 9, 'grass');
@@ -97,7 +97,7 @@ levels.backyard = () => {
 // 2. A rifle in the orchard, a runner that rushes, and the kitten behind the far hedge.
 levels.orchard = () => {
   const L = draft('orchard', 26, 14, 202, {
-    name: 'Orchard', objective: 'rescue-kitten', health: 100, loadout: [HANDGUN], order: 2,
+    name: 'Orchard', objective: 'rescue-kitten', health: 100, loadout: [HANDGUN], order: 2, par: 40,
     brief: 'THE KITTEN IS HIDING PAST THE ORCHARD HEDGE.',
   });
   L.terrain(0, 0, 25, 13, 'grass');
@@ -125,7 +125,7 @@ levels.orchard = () => {
 // 3. Roofs hide what is inside: the shotgun in the coop, a rifleman and the kitten in the house.
 levels.farmhouse = () => {
   const L = draft('farmhouse', 30, 18, 303, {
-    name: 'Farmhouse', objective: 'rescue-kitten', health: 100, loadout: [HANDGUN], order: 3,
+    name: 'Farmhouse', objective: 'rescue-kitten', health: 100, loadout: [HANDGUN], order: 3, par: 45,
     brief: 'FOLLOW THE MEOWING INTO THE FARMHOUSE.',
   });
   L.house(17, 3, 25, 10, 'brick-wall', 'wood-floor', 'roof-red', ['west']);
@@ -158,7 +158,7 @@ levels.farmhouse = () => {
 // 4. Crate stacks and barrels. Grenades arc over cover; the kitten is boxed in by crates.
 levels['crate-yard'] = () => {
   const L = draft('crate-yard', 32, 20, 404, {
-    name: 'Crate Yard', objective: 'rescue-kitten', health: 100, loadout: [HANDGUN, SHOTGUN], order: 4,
+    name: 'Crate Yard', objective: 'rescue-kitten', health: 100, loadout: [HANDGUN, SHOTGUN], order: 4, par: 60,
     brief: 'BOXED IN BY CRATES. BLAST OR SHOOT A WAY IN.',
   });
   L.terrain(0, 0, 31, 19, 'dirt');
@@ -197,7 +197,7 @@ levels['crate-yard'] = () => {
 // 5. A river with one bridge: wardens hold it, a marksman covers it, and the kitten waits on an island.
 levels.riverside = () => {
   const L = draft('riverside', 36, 22, 505, {
-    name: 'Riverside', objective: 'rescue-kitten', health: 110, loadout: [HANDGUN, RIFLE], order: 5,
+    name: 'Riverside', objective: 'rescue-kitten', health: 110, loadout: [HANDGUN, RIFLE], order: 5, par: 60,
     brief: 'STRANDED ON THE ISLAND. WADE ACROSS THE FORD.',
   });
   L.terrain(0, 0, 35, 21, 'grass');
@@ -245,7 +245,7 @@ levels.riverside = () => {
 // 6. A hedge maze: hedges hide you but let shots through. The kitten sits in the centre.
 levels['hedge-maze'] = () => {
   const L = draft('hedge-maze', 34, 26, 606, {
-    name: 'Hedge Maze', objective: 'rescue-kitten', health: 110, loadout: [HANDGUN, RIFLE], order: 6,
+    name: 'Hedge Maze', objective: 'rescue-kitten', health: 110, loadout: [HANDGUN, RIFLE], order: 6, par: 60,
     brief: 'HEDGES HIDE YOU BUT DO NOT STOP BULLETS.',
   });
   L.terrain(0, 0, 33, 25, 'grass');
@@ -300,7 +300,7 @@ levels['hedge-maze'] = () => {
 // 7. A farm on fire. Cinders spray flame, a bruiser charges, and the kitten is inside the barn.
 levels['burning-barn'] = () => {
   const L = draft('burning-barn', 36, 26, 707, {
-    name: 'Burning Barn', objective: 'rescue-kitten', health: 120, loadout: [HANDGUN, SHOTGUN], order: 7,
+    name: 'Burning Barn', objective: 'rescue-kitten', health: 120, loadout: [HANDGUN, SHOTGUN], order: 7, par: 65,
     brief: 'THE BARN IS BURNING. FREEZE THE FIRE CREW.',
   });
   L.terrain(0, 0, 35, 25, 'dirt');
@@ -347,7 +347,7 @@ levels['burning-barn'] = () => {
 // sealed in a brick vault with no door.
 levels['cold-storage'] = () => {
   const L = draft('cold-storage', 38, 28, 808, {
-    name: 'Cold Storage', objective: 'rescue-kitten', health: 120, loadout: [HANDGUN, RIFLE, SHOTGUN], order: 8,
+    name: 'Cold Storage', objective: 'rescue-kitten', health: 120, loadout: [HANDGUN, RIFLE, SHOTGUN], order: 8, par: 80,
     brief: 'THE KITTEN IS SEALED IN THE VAULT. BREAK IN.',
   });
   L.terrain(0, 0, 37, 27, 'dirt');
@@ -398,7 +398,7 @@ levels['cold-storage'] = () => {
 // 10. The finale: a walled fortress with towers, three waves, and the kitten in the keep.
 levels.fortress = () => {
   const L = draft('fortress', 48, 40, 1010, {
-    name: 'Fortress', objective: 'rescue-kitten', health: 150, loadout: [HANDGUN, RIFLE, SHOTGUN, GRENADE], order: 10,
+    name: 'Fortress', objective: 'rescue-kitten', health: 150, loadout: [HANDGUN, RIFLE, SHOTGUN, GRENADE], order: 10, par: 120,
     brief: 'STORM THE FORTRESS. THE KITTEN IS IN THE KEEP.',
   });
   L.terrain(0, 0, 47, 39, 'grass');

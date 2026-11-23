@@ -21,7 +21,12 @@ local MAP_Y = 22
 local INK, PANEL, EDGE = 0x262923, 0x34362d, 0x666b4e
 local TEXT, DIM, CREAM = 0xf6e9d0, 0xbeb095, 0xf1d592
 local GREEN, AMBER, LOCKED = 0xc7dc8c, 0xffc36d, 0x968d70
+local STAR, STAR_EMPTY = 0xffc36d, 0x5c5442
 local text = Pixels.text
+
+local function whole(value)
+  return type(value) == "number" and math.tointeger(value) or nil
+end
 
 function Overworld.new(levels, store)
   local saved = store and store.get("mission_clears")
@@ -38,7 +43,55 @@ function Overworld.new(levels, store)
       if id and id > 0 then arsenal[id] = true end
     end
   end
-  return setmetatable({levels=levels, store=store, cleared=cleared, count=count, arsenal=arsenal}, Overworld)
+  -- Best score (s), best time in seconds (t) and earned star bits (k) per mission id.
+  local stored, records = store and store.get("mission_records"), {}
+  if type(stored) == "table" then
+    for id, entry in pairs(stored) do
+      if type(entry) == "table" then
+        local s, t, k = whole(entry.s), whole(entry.t), whole(entry.k)
+        if s and t and k then records[id] = {s=s, t=t, k=k} end
+      end
+    end
+  end
+  local self = setmetatable({levels=levels, store=store, cleared=cleared, count=count, arsenal=arsenal,
+    records=records}, Overworld)
+  self:count_stars()
+  return self
+end
+
+-- Earned stars for a mission as bits. A clear saved before stars existed still counts as one.
+function Overworld:stars(index)
+  local level = self.levels[index]
+  local record = level and self.records[level.id]
+  return (record and record.k or 0) | (level and self.cleared[level.id] == true and 1 or 0)
+end
+
+function Overworld:count_stars()
+  local total = 0
+  for index = 1, #self.levels do
+    local stars = self:stars(index)
+    total = total + (stars & 1) + (stars >> 1 & 1) + (stars >> 2 & 1)
+  end
+  self.star_count = total
+end
+
+-- Keeps the best score, the best time and every star earned so far.
+-- Returns what this run improved: best_score, best_time and the newly earned star bits.
+function Overworld:record(index, score, seconds, stars)
+  local id = self.levels[index].id
+  local old = self.records[id]
+  local gained = stars & ~self:stars(index)
+  local result = {
+    first=old == nil, gained=gained,
+    best_score=old ~= nil and score > old.s, best_time=old ~= nil and seconds < old.t,
+  }
+  self.records[id] = {
+    s=old and math.max(old.s, score) or score, t=old and math.min(old.t, seconds) or seconds,
+    k=(old and old.k or 0) | stars,
+  }
+  self:count_stars()
+  if self.store then pcall(self.store.set, "mission_records", self.records) end
+  return result
 end
 
 function Overworld:complete(index)
@@ -107,7 +160,7 @@ local function trail(c, first, last, bends, color, width)
   segment(c,a,last,color,width)
 end
 
-local function marker(c, point, index, state, selected)
+local function marker(c, point, index, state, selected, stars)
   local x, y = position(point)
   local label = string.format("%02d",index)
   local w = #label*6 + 8
@@ -129,6 +182,13 @@ local function marker(c, point, index, state, selected)
     c:rect(x+6,top-4,9,7,INK)
     c:rect(x+7,top-3,7,5,CREAM)
     c:rect(x+10,top-2,1,2,INK)
+  end
+  if stars > 0 then
+    -- Three pips under the marker, lit for each star earned.
+    c:rect(x-8,top+14,17,5,INK)
+    for slot = 0, 2 do
+      c:rect(x-7+slot*6,top+15,3,3,stars >> slot & 1 == 1 and STAR or STAR_EMPTY)
+    end
   end
   if state == "CLEARED" then
     c:line(x+7,top-2,x+9,top,INK)
@@ -158,7 +218,7 @@ local function compass(c)
   c:line(x+2,y+1,x,y-4,CREAM)
 end
 
-function Overworld:draw(c, selected, can_back)
+function Overworld:draw(c, selected)
   local art = require("art.overworld")
   local region = (selected-1)//#stops
   local first = region*#stops+1
@@ -207,7 +267,7 @@ function Overworld:draw(c, selected, can_back)
     Pixels.stamp(c,landmark,x-26,y-32,2,art.landmarks.colors)
     local state = self.cleared[level.id] == true and "CLEARED" or not self:unlocked(index) and "LOCKED"
       or index == next_mission and "NEXT" or "UNPLAYED"
-    marker(c,point,index,state,index == selected)
+    marker(c,point,index,state,index == selected,self:stars(index))
     if index == selected then selected_state = state end
   end
 
@@ -216,7 +276,10 @@ function Overworld:draw(c, selected, can_back)
   c:rect(0,MAP_Y-1,320,1,EDGE)
   text(c,"MISSION MAP",8,5,CREAM,2)
   if regions > 1 then text(c,string.format("REGION %02d/%02d",region+1,regions),145,10,DIM) end
-  right(c,self.count.."/"..#self.levels.." CLEARED",311,10,TEXT)
+  local total = self.star_count.."/"..3*#self.levels
+  Pixels.star(c,304,3,STAR)
+  right(c,total,300,3,STAR)
+  right(c,self.count.."/"..#self.levels.." CLEARED",311,13,TEXT)
 
   c:rect(0,178,320,40,INK)
   c:rect(0,178,320,1,EDGE)
@@ -227,17 +290,21 @@ function Overworld:draw(c, selected, can_back)
   else text(c,title:sub(1,33),39,187,TEXT) end
   local status_color = selected_state == "CLEARED" and GREEN or selected_state == "NEXT" and AMBER
     or selected_state == "LOCKED" and LOCKED or DIM
-  right(c,selected_state == "NEXT" and "NEXT STOP" or selected_state,311,187,status_color)
+  local stars = self:stars(selected)
+  if stars > 0 then
+    for slot = 0, 2 do Pixels.star(c,284+slot*10,187,stars >> slot & 1 == 1 and STAR or STAR_EMPTY) end
+  else
+    right(c,selected_state == "NEXT" and "NEXT STOP" or selected_state,311,187,status_color)
+  end
   c:rect(0,201,320,17,PANEL)
   c:rect(0,201,320,1,EDGE)
   text(c,"L/R ROUTE",8,207,CREAM)
-  text(c,"UP RANGE",74,207,DIM)
+  text(c,"UP RANGE  DOWN SPECS",74,207,DIM)
   if selected_state == "LOCKED" then
-    text(c,string.format("CLEAR %02d FIRST",selected-1),135,207,LOCKED)
+    right(c,string.format("CLEAR %02d FIRST",selected-1),311,207,LOCKED)
   else
-    text(c,"SELECT OPEN",135,207,TEXT)
+    right(c,"SELECT OPEN",311,207,TEXT)
   end
-  if can_back ~= false then right(c,"CANCEL BACK",311,207,DIM) end
 end
 
 return Overworld

@@ -1,7 +1,7 @@
 local Range = require("lib.range")
 local Enemies = require("lib.enemies")
 local Squad = require("lib.squad")
-local Cover, Level, Mission
+local Level, Mission
 
 local Game = {}
 Game.__index = Game
@@ -13,7 +13,6 @@ local PICKUP_RADIUS, MEDKIT_HP = 11, 30
 local HIT_POINTS, DEFEAT_POINTS, SCORE_BOOST_SECONDS = 10, 100, 10
 local HURT_DURATION, ROUTE_DURATION, ROUTE_TOLERANCE = 0.18, 0.16, 8
 local MAX_SCORCH_MARKS, SCORCH_MERGE_DISTANCE = 8, 8
-local MAX_ENDLESS_BODIES = 24
 local MAX_PARTICLES, MAX_PROJECTILES, PLAYER_PROJECTILE_RESERVE = 76, 32, 8
 local KNOCK_DECAY, RECOVER_AFTER = 12, 3
 local PLAYER_SURFACE = {name="PLAYER", health=100, radius=6, scale={}}
@@ -88,7 +87,7 @@ function Game.new(seed, drill, surveyed_ground, practice, arsenal)
     pickups=drill and {} or Range.pickups(x, y), targets=drill and {} or Range.targets(x, y),
     reflectors=drill and {} or Range.reflectors(x, y), enemies={}, bodies={}, dt=0,
     owned={[0]=true}, found_ids={}, projectiles={}, particles={}, scorch_marks={}, time=0, cooldown=0,
-    score=(drill == "level" or drill == "endless") and 0 or nil,
+    score=drill == "level" and 0 or nil,
     flash=0, message_until=0, dirty=true, drill=drill,
   }, Game)
   if drill == "level" then
@@ -101,14 +100,9 @@ function Game.new(seed, drill, surveyed_ground, practice, arsenal)
     game.survey = coroutine.create(function() terrain(ground, 56, 40, seed) end)
   end
   game.enemy_targets = {game}
-  if drill == "endless" then
-    Cover = Cover or require("lib.cover")
-    game.cover, game.cover_phase = Cover.layout(0, nil, x, y, PLAYER_SURFACE.radius), 0
-  end
   if drill then
     game.owned[1] = true
-    if drill == "endless" then Squad.start(game, random(seed+801))
-    elseif practice then
+    if practice then
       game.practice = practice
       game.owned[0], game.owned[2], game.owned[11], game.weapon = nil, true, true, 2
       local enemy = game:spawn_enemy(practice, x+79, y+3, 7)
@@ -224,18 +218,7 @@ function Game:add_medkit(x, y)
   self.dirty = true
 end
 
-function Game:drop_weapon(id, x, y)
-  if self.owned[id] then return end
-  for _, item in ipairs(self.pickups) do
-    if item.id == id then return end
-  end
-  self.pickups[#self.pickups+1] = {id=id, x=x, y=y}
-  self.dirty = true
-end
-
 function Game:clamp_position(x, y)
-  local arena = self.arena
-  if arena then return clamp(x, arena.left, arena.right), clamp(y, arena.top, arena.bottom) end
   local margin = self.level and 6 or 16
   return clamp(x, margin, self.width-margin), clamp(y, margin, self.height-margin)
 end
@@ -243,11 +226,10 @@ end
 -- kind picks what a level cell must block: "shot" (default), "rail", "lob", "sight" or "walk".
 function Game:cover_entry(x, y, dx, dy, reach, padding, kind, region, z, dz)
   if self.level then return Level.entry(self.level, x, y, dx, dy, reach, padding, kind, region, z, dz) end
-  if self.cover then return Cover.entry(self.cover, x, y, dx, dy, reach, padding or 0) end
 end
 
 function Game:obstructed()
-  return self.cover ~= nil or self.level ~= nil
+  return self.level ~= nil
 end
 
 local function shot_height(actor, target)
@@ -282,27 +264,17 @@ function Game:can_lob(actor, target)
 end
 
 function Game:can_stand(x, y, radius)
-  if self.level then return Level.can_stand(self.level, x, y, radius) end
-  return not self.cover or Cover.can_stand(self.cover, x, y, radius)
-end
-
-function Game:rotate_cover(wave)
-  if not self.cover then return false end
-  local phase = (wave-1)//3
-  if phase == self.cover_phase then return false end
-  local previous = self.cover
-  self.cover, self.cover_phase = Cover.layout(phase,previous,self.x,self.y,self.surface.radius), phase
-  return self.cover ~= previous
+  return not self.level or Level.can_stand(self.level, x, y, radius)
 end
 
 function Game:detour(enemy, tx, ty)
-  if enemy.roof or not self.cover and not self.level then return false end
+  if enemy.roof or not self.level then return false end
   local previous_x, previous_y
   if enemy.route_until and self.time < enemy.route_until
     and (tx-enemy.route_goal_x)^2 + (ty-enemy.route_goal_y)^2 <= ROUTE_TOLERANCE^2 then
     previous_x, previous_y = enemy.route_x, enemy.route_y
   end
-  local x, y = (self.level and Level or Cover).waypoint(self.level or self.cover, enemy.x, enemy.y, tx, ty,
+  local x, y = Level.waypoint(self.level, enemy.x, enemy.y, tx, ty,
     enemy.surface.radius, previous_x, previous_y)
   if not x then
     enemy.route_until = nil
@@ -323,8 +295,9 @@ end
 
 local function actor_position(game, actor, x, y)
   x, y = game:clamp_position(x, y)
-  if game.level then return Level.slide(game.level, actor.x, actor.y, x, y, actor.surface.radius, actor.roof) end
-  if game.cover then return Cover.slide(game.cover, actor.x, actor.y, x, y, actor.surface.radius) end
+  if game.level then
+    return Level.slide(game.level, actor.x, actor.y, x, y, actor.surface.radius, actor.roof, actor == game)
+  end
   return x, y
 end
 
@@ -741,7 +714,9 @@ function Game:damage(target, amount, effect, contacts)
   local scale = target.surface.scale[effect] or 1
   local damage = min(target.health, max(1, floor(amount * scale + 0.5)))
   target.health = target.health - damage
-  if target == self and damage > 0 then self.hurt_until = self.time + HURT_DURATION end
+  if target == self and damage > 0 then
+    self.hurt_until, self.damage_taken = self.time + HURT_DURATION, (self.damage_taken or 0) + damage
+  end
   if target.dormant then target.dormant, target.alerted = nil, true end
   local on_hit = target.profile and target.profile.on_hit
   if on_hit and damage > 0 then on_hit(self, target, effect) end
@@ -751,7 +726,6 @@ function Game:damage(target, amount, effect, contacts)
     if damage > 0 and target.profile then
       if self.score then self:add_score(DEFEAT_POINTS) end
       local bodies = self.bodies
-      if self.drill == "endless" and #bodies == MAX_ENDLESS_BODIES then table.remove(bodies, 1) end
       bodies[#bodies+1] = {x=target.x, y=target.y, roof=target.roof, skin=target.profile.skin}
     end
   end
@@ -1199,7 +1173,7 @@ function Game.movers.orb(self, shot, dt)
       if distance <= weapon.pull and distance > 6 and (not self.level or self:line_clear(shot.x,shot.y,target.x,target.y)) then
         local move = min(distance - 6, weapon.pull_speed*dt) / distance
         local x, y = target.x + dx*move, target.y + dy*move
-        if self.cover or self.level then x, y = actor_position(self, target, x, y) end
+        if self.level then x, y = actor_position(self, target, x, y) end
         target.x, target.y = x, y
         if target.home_x then target.reset_at = max(target.reset_at or 0, self.time + RECOVER_AFTER) end
       end
@@ -1239,7 +1213,6 @@ local function drill_result(game)
   if game.health == 0 then return "lost" end
   if game.pending_blasts then return end
   if game.mission then return Mission.update(game) end
-  if game.squad then return Squad.update(game) end
   for _, enemy in ipairs(game.enemies) do
     if enemy.health > 0 then return end
   end

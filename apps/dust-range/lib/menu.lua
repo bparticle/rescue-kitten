@@ -6,27 +6,21 @@ local icons = require("art.icons")
 
 local Menu = {}
 Menu.__index = Menu
-local range_options = {
-  {"resume", "RESUME RANGE"}, {"specs", "WEAPON SPECS"}, {"endless", "ENDLESS RUN"}, {"exit", "EXIT GAME"},
-}
-local level_options = {
-  {"resume", "RESUME RANGE"}, {"specs", "WEAPON SPECS"}, {"missions", "MISSION MAP"},
-  {"endless", "ENDLESS RUN"}, {"exit", "EXIT GAME"},
-}
--- Endless Run and enemy practice from the field guide.
-local drill_options = {
-  {"resume", "RESUME"}, {"drill", "RETRY"},
-  {"range", "BACK TO RANGE"}, {"exit", "EXIT GAME"},
-}
-local mission_options = {
-  {"resume", "RESUME"}, {"drill", "RETRY MISSION"}, {"missions", "MISSION MAP"},
-  {"range", "TESTING RANGE"}, {"exit", "EXIT GAME"},
-}
-
+-- Every pause menu has the same entries in the same order. Entries that don't apply are left out:
+-- Retry only in a mission or practice, Testing Range only away from it, Mission Map only with levels.
+local option_lists = {}
 function Menu.options(drill, has_levels)
-  if drill == "level" then return mission_options end
-  if drill then return drill_options end
-  return has_levels and level_options or range_options
+  local key = tostring(drill) .. tostring(has_levels)
+  local options = option_lists[key]
+  if options then return options end
+  options = {{"resume", drill and "RESUME" or "RESUME RANGE"}}
+  if drill then options[#options+1] = {"drill", drill == "level" and "RETRY MISSION" or "RETRY"} end
+  if has_levels then options[#options+1] = {"missions", "MISSION MAP"} end
+  if drill then options[#options+1] = {"range", "TESTING RANGE"} end
+  options[#options+1] = {"specs", "WEAPON SPECS"}
+  options[#options+1] = {"exit", "EXIT GAME"}
+  option_lists[key] = options
+  return options
 end
 
 local text, stamp = Pixels.text, Pixels.stamp
@@ -87,14 +81,13 @@ local function wrap(value, width)
   return lines
 end
 
-local menu_rows = {[4]={32,26}, [5]={25,21}, [6]={22,18}, [7]={18,16}}
+local menu_rows = {[3]={36,28}, [4]={32,26}, [5]={25,21}, [6]={22,18}, [7]={18,16}}
 
 function Menu:draw_pause(choice, game, hero, has_levels, pickup_motion)
   local c = self.canvas
   frame(c, "UP/DOWN MOVE  SELECT OPEN", "CANCEL RESUME")
   text(c,"DUSTPAW",14,19,BRASS,3)
   local title = game.drill and "DRILL PAUSED" or "RANGE PAUSED"
-  if game.drill == "endless" then title = "ENDLESS PAUSED" end
   if game.mission then title = "MISSION PAUSED" end
   if game.practice then title = "PRACTICE PAUSED" end
   right(c,title,306,29,DIM)
@@ -293,7 +286,26 @@ local objectives = {
 }
 
 -- Returns true when the screen needs another call with rest = true to finish drawing.
-function Menu:draw_briefing(level, index, rest)
+-- Star goals under the briefing panel: each star lights up once earned.
+local function star_goals(c, level, stars, y)
+  local Mission = require("lib.mission")
+  local goals = {
+    {Mission.STAR_CLEAR, level.objective == "rescue-kitten" and "RESCUE" or "CLEAR"},
+    {Mission.STAR_PAR, level.par and "PAR " .. level.par .. "S" or "NO PAR"},
+    {Mission.STAR_HEALTH, "LOSE " .. Mission.damage_limit(level.health) .. " HP OR LESS"},
+  }
+  local x = 18
+  for _, goal in ipairs(goals) do
+    local earned = stars & goal[1] ~= 0
+    Pixels.star(c,x,y,earned and 0xffc36d or 0x6b624c)
+    text(c,goal[2],x+11,y,earned and TEXT or DIM)
+    x = x + 11 + 6*#goal[2] + 16
+  end
+end
+
+-- record: the saved best for this mission ({s=score, t=seconds}) or nil. stars: earned star bits.
+function Menu:draw_briefing(level, index, rest, record, stars)
+  stars = stars or 0
   local c = self.canvas
   local goal = objectives[level.objective] or objectives.clear
   local rescue = level.objective == "rescue-kitten"
@@ -316,7 +328,8 @@ function Menu:draw_briefing(level, index, rest)
   end
   frame(c,"SELECT START", "CANCEL MAP")
 
-  text(c,"DUSTPAW",18,18,DIM)
+  if record then text(c,"BEST " .. record.s .. "  " .. record.t .. "S",18,18,BRASS)
+  else text(c,"DUSTPAW",18,18,DIM) end
   right(c,string.format("MISSION %02d",index),302,18,BRASS)
   c:rect(18,34,284,1,BORDER)
 
@@ -343,6 +356,7 @@ function Menu:draw_briefing(level, index, rest)
     c:rect(228,150,36,14,0x35382d)
     stamp(c,kitten.art,247-(kitten.w*4)//2,108,4,kitten.colors)
   end
+  star_goals(c,level,stars,185)
 end
 
 return Menu

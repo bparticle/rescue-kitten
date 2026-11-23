@@ -10,14 +10,14 @@ Use Solana OS 2.0 or newer for the 6 MiB Lua heap. The app uses the LED permissi
 
 Dustpaw has two modes: **Missions**, the main game, and the **Testing Range**. The game opens on the **Mission Map**. Only Backyard is open at first: each rescue unlocks the next mission, and cleared missions stay open to replay. Locked stops show a padlock and can be browsed but not opened. Select Backyard to see its title card, then press **Select** to start. Walk up to the kitten to pick it up, then carry it to the exit. After a successful rescue, press **Select** to return to the map. Cleared missions are saved on the device, and the map highlights the first unfinished mission when you return from a rescue or relaunch the game.
 
-Weapons you pick up in a mission are saved as soon as you collect them, even if the rescue fails. Every later mission starts with its own loadout plus your saved weapons, and **Cancel** cycles through all of them. The Testing Range and Endless Run keep their own gear and don't add to your saved weapons.
+Weapons you pick up in a mission are saved as soon as you collect them, even if the rescue fails. Every later mission starts with its own loadout plus your saved weapons, and **Cancel** cycles through all of them. The Testing Range and enemy practice keep their own gear and don't add to your saved weapons.
 
-On the map, press **Left/Right** to follow the route and **Select** to open the briefing of any unlocked location. Press **Up** for the Testing Range. Both the map and the range are available from the mission pause menu.
+On the map, press **Left/Right** to follow the route and **Select** to open the briefing of any unlocked location. Press **Up** for the Testing Range and **Down** for Weapon Specs.
 
 - **D-pad** moves the hero and sets the firing direction. Walk over a floating weapon to pick it up and equip it. When the nearest available pickup is at the edge of the screen or beyond it, the marker is amber for weapons and a green cross for medkits.
 - **Select** fires, throws, swings, or places the equipped item. Hold it for the rifle, flamethrower and cryo sprayer. Hold and release it to fire the charge cannon. The range has unlimited ammunition.
 - Tap **Cancel** to cycle through collected weapons and the unarmed stance. Hold **Cancel** for 1.2 seconds to pause at the menu.
-- In the menu, use **Up/Down** and **Select** to resume, open **Weapon Specs**, open the **Mission Map**, start **Endless Run**, or exit. Use **Left/Right** on the pause menu to toggle pickup bobbing. In Weapon Specs, **Left/Right** browse weapons and **Select** goes to the next page. **Cancel** goes back one screen. **Home** returns directly to the launcher.
+- Every pause menu has the same entries in the same order: **Resume**, **Retry** (in a mission or practice), **Mission Map**, **Testing Range** (when you're not already there), **Weapon Specs** and **Exit Game**. Use **Up/Down** and **Select** to choose. Use **Left/Right** on the pause menu to toggle pickup bobbing. In Weapon Specs, **Left/Right** browse weapons and **Select** goes to the next page. **Cancel** goes back one screen: to the menu, or to the map if you opened Weapon Specs there. **Home** returns directly to the launcher.
 - In **Weapon Specs**, press **Down** for the Enemy Field Guide. Browse enemy profiles with **Left/Right** and press **Select** to practice against that enemy. **Up** returns to Weapon Specs. The medic practice includes an injured ally so you can try interrupting the heal.
 
 The pickup message points toward that weapon's test target. The direction follows the D-pad, so tap toward the target before firing. You can shoot any target with any weapon.
@@ -26,13 +26,15 @@ Each target has a health bar. The HUD shows the damage type, damage dealt, and r
 
 The six top LEDs show the equipped weapon's family: 1 pistols (handgun, bankshot), 2 rifles (assault rifle, rail rifle), 3 close range (shotgun, shock hammer), 4 throwables (grenade, TNT, boomerang disc), 5 heavy (rocket launcher, charge cannon, gravity orb) and 6 projectors (flamethrower, arc projector, cryo sprayer). A newly collected slot flares gold, the weapon in hand glows amber, and a confirmed hit sends a red pulse from the center to the edges.
 
-Your health is shown at the right of the HUD in every mode. Endless Run and enemy practice start at 100 HP; each mission sets its own starting health. When wounded, you also get a small bar above your character. The playfield border and two side LEDs flash on damage, and the HUD warns at 25 HP or below. The weapon-testing range is safe for testing your gear.
+Your health is shown at the right of the HUD in every mode. Enemy practice starts at 100 HP; each mission sets its own starting health. When wounded, you also get a small bar above your character. The playfield border and two side LEDs flash on damage, and the HUD warns at 25 HP or below. The weapon-testing range is safe for testing your gear.
 
 Walk over a medkit in a mission to restore up to 30 HP. A medkit stays available until you pick it up while wounded.
 
-In Missions and Endless Run, earn 10 points per enemy hit and 100 extra when an enemy goes down. Multiple pellets from one shot award 10 points per enemy hit. Extracting with the kitten earns 500 points. Each successful mission also awards a time bonus that starts at 600 and drops by 10 per second of play.
+In missions, earn 10 points per enemy hit and 100 extra when an enemy goes down. Multiple pellets from one shot award 10 points per enemy hit. Extracting with the kitten earns 500 points. Each successful mission also awards a time bonus of 600 if you finish within the mission's par time. Past par, the bonus drops by 10 per second.
 
-Walk over a hamburger to double combat and rescue points for 10 seconds. Another hamburger restarts the countdown. The HUD shows your score and the remaining boost time, and the mission results show the final score and time bonus.
+Walk over a hamburger to double combat and rescue points for 10 seconds. Another hamburger restarts the countdown. The HUD shows your score and the remaining boost time, and the mission results show the final score, your time and the time bonus.
+
+Each mission has three stars: one for the rescue, one for finishing within par time, and one for losing no more than a quarter of your starting health. The briefing lists the three goals, and the stars you've earned stay lit. Stars add up across runs, so you can go for one goal at a time. The device saves your best score and best time for each mission and shows them on the briefing. The results screen marks newly earned stars and any new best. The Mission Map shows each mission's stars under its marker and your star total at the top right. Clears saved before stars were added count as one star.
 
 ## Missions
 
@@ -51,15 +53,12 @@ Ten kitten rescues, from a backyard with one guard to a three-wave assault on a 
 | 9 | Outpost | Every material in the tileset, the kitten in the barn across the river |
 | 10 | Fortress | Gravity orb and shock hammer, all enemy types, three waves, rooftop marksmen |
 
-## Testing Range modes
+## Enemy practice
 
-- **Endless Run** is a wave survival mode, available from the range menu. You start with the handgun, assault rifle, pump shotgun, rail rifle and arc projector. Tap **Cancel** to switch between them. Later waves can contain up to 14 enemies, with at most eight active at once. Gold ground markers show where reinforcements will arrive.
-- Runners circle at a distance and rush in one at a time, then mark the ground before striking. Riflemen fire bursts, and scatterguards hold just inside their short spread. Lobbers mark a grenade's landing zone. Wardens lower their frontal shield while aiming, and skirmishers strafe between shots. Hit a medic during its green cue to interrupt a heal. Sidestep a bruiser's marked charge or interrupt it with the arc projector. Bruisers back off after each charge. A red edge marker points to an enemy beyond the screen.
-- Between waves you recover up to 24 HP and clear burn and frost effects. The HUD shows BURNING or CHILLED while those effects are active.
-- In **Weapon Specs**, the Enemy Field Guide starts a practice fight against any enemy.
-- At 0 HP, combat stops. After a win or loss, press **Select** to retry at full health. Hold **Cancel** to pause, then choose **Back to Range** to resume the original weapon-testing session.
-- Endless Run rotates its barricade layout every three waves. Barricades block movement and direct shots. Enemies route around them, and lobbers can aim over them. Late marksmen show a pink lane before they fire.
-- Cinders can leave the player burning. Cryo techs slow movement until their frost wears off or a follow-up hit shatters it. Each can drop its weapon once per run.
+- In **Weapon Specs**, press **Down** for the Enemy Field Guide and **Select** to practice against any enemy. You start with the handgun and assault rifle, plus the arc projector as a counter.
+- Runners circle at a distance and rush in one at a time, then mark the ground before striking. Riflemen fire bursts, and scatterguards hold just inside their short spread. Lobbers mark a grenade's landing zone. Wardens lower their frontal shield while aiming, and skirmishers strafe between shots. Hit a medic during its green cue to interrupt a heal. Sidestep a bruiser's marked charge or interrupt it with the arc projector. Bruisers back off after each charge. Marksmen show a pink lane before they fire. A red edge marker points to an enemy beyond the screen.
+- Cinders can leave the player burning. Cryo techs slow movement until their frost wears off or a follow-up hit shatters it. The HUD shows BURNING or CHILLED while those effects are active.
+- At 0 HP, combat stops. After a win or loss, press **Select** to retry at full health. Hold **Cancel** to pause, then choose **Testing Range** to resume the original weapon-testing session.
 
 ## Level editor
 
@@ -114,11 +113,11 @@ Each of the 15 weapons has a hero walk sheet (`sprites/hero/walk-<weapon>.png`) 
 
 - `python tools/build_assets.py` regenerates the packaged Lua artwork after PNG edits, including one `art/fx-<weapon>.lua` module per effect set. It requires Pillow.
 - `python tools/draw_new_weapon_art.py` drew the first pass of the starter-arsenal hero sheets and effect sheets. It overwrites those PNGs, so run it only to start over. Edit the PNGs directly after that.
-- `node tools/smoke.mjs` checks the range, Endless Run, enemy practice, input, and LEDs with the sibling `mosa-badge` headless host at 16 ms per tick. It reports callback instructions, sampled Lua heap, and UI objects.
-- `node tools/bench.mjs` measures combat, startup and repeat retries. It estimates sideload file-read costs and compares the packed-run fallback with a model of the native RGB565 tile renderer. On the badge or official emulator, `lua mem` in the console reports the previous run's actual peaks after closing the app.
+- `node tools/smoke.mjs` checks the range, enemy practice, menus, input, and LEDs with the sibling `mosa-badge` headless host at 16 ms per tick. It reports callback instructions, sampled Lua heap, and UI objects.
+- `node tools/bench.mjs` measures startup, combat in the Fortress mission and repeat retries. It estimates sideload file-read costs and compares the packed-run fallback with a model of the native RGB565 tile renderer. On the badge or official emulator, `lua mem` in the console reports the previous run's actual peaks after closing the app.
 - `node tools/love-check.mjs` checks that the [LÖVE version](hosts/love/README.md) still runs the current game. It runs both smoke suites on the LuaJIT translation and boots the game in LÖVE when LÖVE is installed.
 - Both tools accept `DUST_RANGE_TICK_MS=30` for the original cadence, `DUST_RANGE_APP_DIR` for an extracted release, and `MOSA_BADGE_DIR` for a different headless host checkout.
 
-Enemy profiles in `apps/dust-range/lib/enemies.lua` define health, hit radius, movement, weapons, and behavior. Range-keeping (`fire_range` and `retreat_range`), the melee standoff ring (`standoff`), and charge and support behavior live in `lib/ai/`. `lib/squad.lua` runs Endless Run waves, spawn spacing and the shared attack schedule, which staggers attack releases and lets only one melee rush start at a time. `lib/endless.lua` generates rosters from wave budgets and per-role limits with its own seeded random sequence. Levels use the same attack schedule.
+Enemy profiles in `apps/dust-range/lib/enemies.lua` define health, hit radius, movement, weapons, and behavior. Range-keeping (`fire_range` and `retreat_range`), the melee standoff ring (`standoff`), and charge and support behavior live in `lib/ai/`. `lib/squad.lua` holds the attack schedule missions share, which staggers attack releases and lets only one melee rush start at a time.
 
 Run `python tools/package.py` to rebuild `dist/dustpaw.zip` and check file count, unpacked size, and path limits.

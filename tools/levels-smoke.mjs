@@ -429,6 +429,30 @@ check('player cannot walk through a wall', `local g = fresh()
   g.x, g.y = centre(9), centre(1) + 4
   run(g, 800, {down=true})
   return tostring(g.y < 3*16)`, 'true');
+check('player clears doorframes when slightly off center', `local g = fresh()
+  for _, e in ipairs(g.enemies) do e.health = 0 end
+  local x, y = centre(18), centre(20)
+  for _, offset in ipairs({-6, 6}) do
+    g.x, g.y = x+offset, y-20
+    run(g, 400, {down=true})
+    assert(g.y > y+8, "enter from north")
+    g.x, g.y = x+offset, y+20
+    run(g, 400, {up=true})
+    assert(g.y < y-8, "exit to north")
+  end
+  g.x, g.y = x+12, y-20
+  run(g, 400, {down=true})
+  assert(g.x == x+12 and g.y < y, "the wall beside the door still blocks movement")
+  x, y = centre(36), centre(7)
+  for _, offset in ipairs({-6, 6}) do
+    g.x, g.y = x-20, y+offset
+    run(g, 400, {right=true})
+    assert(g.x > x+8, "enter from west")
+    g.x, g.y = x+20, y+offset
+    run(g, 400, {left=true})
+    assert(g.x < x-8, "exit to west")
+  end
+  return "ok"`, 'ok');
 check('player slides along the river bank', `local g = fresh()
   g.x, g.y = centre(28), centre(4)
   run(g, 600, {right=true})
@@ -521,10 +545,10 @@ check('scoring counts each attack once per enemy and pays for a defeat once', `
   g:damage(enemy, 999, "impact", {})
   g:damage(enemy, 999, "impact", {})
   assert(g.score == 120)
-  local endless = Game.new(427, "endless", {})
-  endless:damage(endless.enemies[1], 999, "burn")
-  assert(Game.new(427, "level", nil, "backyard").score == 0)
-  return endless.score
+  local burned = fresh("backyard")
+  burned:damage(burned.enemies[1], 999, "burn")
+  assert(Game.new(427, "level", nil, "backyard").score == 0 and Game.new(427, true).score == nil)
+  return burned.score
 `, 100);
 
 check('hamburger works at full health, refreshes 2X, and expires', `
@@ -563,12 +587,25 @@ check('kitten and time points are awarded at extraction and the final score free
   move_to(g, g.mission.kitten)
   assert(g.score == 0 and g.mission.carrying)
   move_to(g, g.exit)
-  assert(g.result == "won" and g.time_bonus == 520 and g.score == 1520)
+  assert(g.result == "won" and g.time_bonus == 600 and g.score == 1600, "under par keeps the full bonus")
+  assert(g.clear_time == 8 and g.stars == 7, "a fast, unhurt rescue earns all three stars")
   assert(not g.score_boost and not g.score_boost_until)
   run(g, 100)
-  assert(g.score == 1520)
+  assert(g.score == 1600)
+  local late = fresh("backyard")
+  late.time = 30
+  move_to(late, late.mission.kitten)
+  move_to(late, late.exit)
+  assert(late.result == "won" and late.time_bonus == 500 and late.score == 1000, "the bonus drops 10 per second past par")
+  assert(late.stars == 5, "missing par loses only the time star")
+  local hurt = fresh("backyard")
+  hurt.time = 5
+  hurt:damage(hurt, 26, "impact")
+  move_to(hurt, hurt.mission.kitten)
+  move_to(hurt, hurt.exit)
+  assert(hurt.result == "won" and hurt.damage_taken == 26 and hurt.stars == 3, "losing over a quarter of health loses the health star")
   local slow = fresh("backyard")
-  slow.time = 61
+  slow.time = 80
   move_to(slow, slow.mission.kitten)
   move_to(slow, slow.exit)
   assert(slow.result == "won" and slow.score == 500 and slow.time_bonus == 0)
@@ -579,6 +616,40 @@ check('kitten and time points are awarded at extraction and the final score free
   assert(lost.result == "lost" and not lost.time_bonus)
   return lost.score
 `, 0);
+
+check('mission records keep the best score, best time and every star earned', `
+  local Overworld = require("lib.overworld")
+  local saved = {}
+  local store = {get=function(key) return saved[key] end, set=function(key, value) saved[key] = value end}
+  local levels = {{id="a"}, {id="b"}}
+  local map = Overworld.new(levels, store)
+  local first = map:record(1, 900, 30, 5)
+  assert(first.first and first.gained == 5 and not first.best_score and not first.best_time)
+  map:complete(1)
+  local second = map:record(1, 800, 25, 3)
+  assert(not second.first and second.gained == 2 and not second.best_score and second.best_time)
+  local third = map:record(1, 950, 40, 1)
+  assert(third.gained == 0 and third.best_score and not third.best_time)
+  local a = saved.mission_records.a
+  assert(a.s == 950 and a.t == 25 and a.k == 7 and map.star_count == 3)
+  saved.mission_records.a = {s=950.0, t=25.0, k=7.0, extra="kept out"}
+  saved.mission_records.b = {s="bad"}
+  local reloaded = Overworld.new(levels, store)
+  assert(reloaded:stars(1) == 7 and reloaded:stars(2) == 0 and reloaded.star_count == 3)
+  assert(reloaded.records.a.t == 25 and not reloaded.records.b)
+  local legacy = Overworld.new(levels, {get=function(key) return key == "mission_clears" and {b=true} or nil end})
+  assert(legacy:stars(2) == 1 and legacy.star_count == 1, "clears saved before stars count as one star")
+  return reloaded.records.a.s
+`, 950);
+
+check('results show stars and a new best', `
+  local g, v = fresh("backyard"), View.new()
+  v.canvas:show(false); v.strip:show(false)
+  g.result, g.score, g.time_bonus, g.clear_time, g.stars = "won", 1600, 600, 8, 7
+  g.record = {gained=2, best_score=true, best_time=true}
+  v:draw(g)
+  return "drawn"
+`, 'drawn');
 
 // The map opens first, only Backyard is open, then rescue, extraction, and the next mission.
 const status = () => lua('return table.concat({range_status()}, ",")').split(',');
@@ -626,6 +697,10 @@ if (shots) badge.screenshot(path.join(shots, 'mission-hamburger.png'));
 await badge.hold('down', 24);
 assert.equal(status()[14], 'won', 'carrying the kitten to the exit completes the mission');
 assert.deepEqual(JSON.parse(badge.storageJson()).mission_clears, { backyard: true }, 'winning saves the completed mission');
+{
+  const record = JSON.parse(badge.storageJson()).mission_records.backyard;
+  assert.ok(record && record.s > 0 && record.t <= 20 && (record.k & 3) === 3, `the rescue saves a record: ${JSON.stringify(record)}`);
+}
 if (shots) badge.screenshot(path.join(shots, 'mission-rescued.png'));
 await badge.press('select');
 assert.equal(status()[9], 'missions');
@@ -660,7 +735,6 @@ assert.equal(status()[9], 'range');
 assert.equal(status()[12], 'range', 'Up on the map opens the testing range');
 await badge.frames(30);
 await badge.hold('back', Math.ceil(1240 / 16));
-await badge.press('down');
 await badge.press('down');
 await badge.press('select');
 assert.equal(status()[9], 'missions');

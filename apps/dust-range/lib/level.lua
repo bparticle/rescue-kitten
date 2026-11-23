@@ -1,5 +1,5 @@
 -- Tile levels built with tools/level-builder. Cells are 16 native pixels.
--- Implements the same queries as lib/cover.lua (entry, can_stand, slide, waypoint) on a grid,
+-- Answers the game's collision queries (entry, can_stand, slide, waypoint) on a grid,
 -- plus tile damage, roofs, slow ground and hazards. Tile properties: sprites/tiles/materials.json.
 local tiles = require("art.tiles")
 
@@ -300,7 +300,7 @@ local function cast(level, x, y, dx, dy, reach, kind, region, z, dz, ignored)
   end
 end
 
--- Same contract as Cover.entry. padding > 0 sweeps an actor body and only checks walking.
+-- Distance to the first blocking cell, or nil. padding > 0 sweeps an actor body and only checks walking.
 function Level.entry(level, x, y, dx, dy, reach, padding, kind, region, z, dz, ignored)
   dz = dz or 0
   if reach <= 0 or (dx == 0 and dy == 0 and dz == 0) then return end
@@ -362,6 +362,7 @@ local function slide_axis(level, start, target, cross, r, vertical, roof)
   local c0 = max(0, floor((cross-r)/SIZE))
   local c1 = min(cross_cells-1, floor((cross+r)/SIZE))
   local forward = target > start
+  local wall_cell
   for c = c0, c1 do
     for a = a0, a1 do
       local i = vertical and a*level.w+c+1 or c*level.w+a+1
@@ -371,21 +372,51 @@ local function slide_axis(level, start, target, cross, r, vertical, roof)
           local cross_min, cross_max = c*SIZE+box[cross_axis], c*SIZE+box[cross_axis+2]
           if cross+r > cross_min and cross-r < cross_max then
             local lo, hi = a*SIZE+box[along_axis], a*SIZE+box[along_axis+2]
-            if forward and start <= lo-r and target >= lo-r then target = lo-r-0.01
-            elseif not forward and start >= hi+r and target <= hi+r then target = hi+r+0.01 end
+            if forward and start <= lo-r and target >= lo-r then
+              target, wall_cell = lo-r-0.01, a
+            elseif not forward and start >= hi+r and target <= hi+r then
+              target, wall_cell = hi+r+0.01, a
+            end
           end
         end
       end
     end
   end
-  return target
+  return target, wall_cell
 end
 
-function Level.slide(level, x, y, next_x, next_y, radius, roof)
+-- A player lined up with the doorway tile can still graze a jamb with their body.
+-- Slide sideways toward the opening by at most one step, using the same wall collision.
+local function doorway_alignment(level, wall_cell, stopped, cross, step, r, vertical)
+  local cross_cell = floor(cross/SIZE)
+  local i = vertical and wall_cell*level.w+cross_cell+1 or cross_cell*level.w+wall_cell+1
+  local door = level.structure[i]
+  if not door or door.id ~= "doorway" or door.variant ~= (vertical and 1 or 2)
+    or level.mask[i] & WALK ~= 0 then return end
+  local center = cross_cell*SIZE + SIZE/2
+  local target = max(cross-step, min(cross+step, center))
+  local aligned = slide_axis(level, cross, target, stopped, r, not vertical)
+  if aligned ~= cross then return aligned end
+end
+
+function Level.slide(level, x, y, next_x, next_y, radius, roof, assist_doors)
   local r = min(radius, MAX_BODY)
-  x = slide_axis(level, x, next_x, y, r, false, roof)
-  y = slide_axis(level, y, next_y, x, r, true, roof)
-  return x, y
+  local stop_x, wall_x = slide_axis(level, x, next_x, y, r, false, roof)
+  local stop_y, wall_y = slide_axis(level, y, next_y, stop_x, r, true, roof)
+  if assist_doors and not roof then
+    local aligned_x = wall_y and doorway_alignment(level, wall_y, stop_y, stop_x, abs(next_y-y), r, true)
+    if aligned_x then
+      stop_x = aligned_x
+      stop_y = slide_axis(level, stop_y, next_y, stop_x, r, true)
+    elseif wall_x then
+      local aligned_y = doorway_alignment(level, wall_x, stop_x, stop_y, abs(next_x-x), r, false)
+      if aligned_y then
+        stop_y = aligned_y
+        stop_x = slide_axis(level, stop_x, next_x, stop_y, r, false)
+      end
+    end
+  end
+  return stop_x, stop_y
 end
 
 function Level.speed(level, x, y)

@@ -8,9 +8,9 @@ Dustpaw levels are tile maps built with the local level builder and exported as 
 node tools/level-builder/server.mjs
 ```
 
-Open http://localhost:5178. Saved levels go to `levels/<id>.json`. **Export to badge** writes `apps/dust-range/levels/<id>.lua` and rebuilds `levels/index.lua`, which adds the level to the **Mission Map**. Set **Menu order** to place it on the route. **Briefing** is an optional line shown on the mission's briefing screen. It wraps to two lines of 27 characters, and the badge font has letters, digits and `/ . % < > + -`. **Build ZIP** runs `tools/package.py`.
+Open http://localhost:5178. Saved levels go to `levels/<id>.json`. **Export to badge** writes `apps/dust-range/levels/<id>.lua` and rebuilds `levels/index.lua`, which adds the level to the **Mission Map**. Set **Menu order** to place it on the route. **Briefing** is an optional line shown on the mission's briefing screen. It wraps to two lines of 27 characters, and the badge font has letters, digits and `/ . % < > + -`. **Par time** is the number of seconds for the time star. Finishing within it keeps the full 600-point time bonus. Leave it empty for a mission without a time star. **Build ZIP** runs `tools/package.py`.
 
-Each map region holds up to ten locations. Further exports continue the same route onto the next region. New missions use a camp illustration by default. To give a mission its own landmark, add its level ID and drawing to `tools/draw_overworld.py` and run `python tools/draw_overworld.py` to regenerate the packed artwork. Completion is saved by level ID, so reordering missions keeps their cleared status. A mission is open when it comes first, is cleared, or follows a cleared mission on the route.
+Each map region holds up to ten locations. Further exports continue the same route onto the next region. New missions use a camp illustration by default. To give a mission its own landmark, add its level ID and drawing to `tools/draw_overworld.py` and run `python tools/draw_overworld.py` to regenerate the packed artwork. Completion, stars and best results are saved by level ID, so reordering missions keeps them. A mission is open when it comes first, is cleared, or follows a cleared mission on the route.
 
 | Key | Tool |
 | --- | --- |
@@ -118,4 +118,4 @@ Every tile's behaviour comes from `sprites/tiles/materials.json`. The game, the 
 
 ## Export format
 
-`apps/dust-range/levels/<id>.lua` returns the level size, objective, health, loadout and entities. It also has one string per layer, with one or two characters per cell. Each character indexes that layer's legend of `material/variant` keys, or `T<n>` for range terrain tiles. An `@` suffix can add supporting artwork such as a surface underneath, lane markings or a roof detail. The first line holds JSON metadata that the builder uses to rebuild `index.lua`.
+`apps/dust-range/levels/<id>.lua` returns the level size, objective, health, optional par time, loadout and entities. It also has one string per layer, with one or two characters per cell. Each character indexes that layer's legend of `material/variant` keys, or `T<n>` for range terrain tiles. An `@` suffix can add supporting artwork such as a surface underneath, lane markings or a roof detail. The first line holds JSON metadata that the builder uses to rebuild `index.lua`.
