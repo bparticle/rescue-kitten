@@ -24,6 +24,8 @@ local GREEN, AMBER, LOCKED = 0xc7dc8c, 0xffc36d, 0x968d70
 local STAR, STAR_EMPTY = 0xffc36d, 0x5c5442
 local text = Pixels.text
 
+local PACK_SIZE = 3
+
 local function whole(value)
   return type(value) == "number" and math.tointeger(value) or nil
 end
@@ -53,10 +55,64 @@ function Overworld.new(levels, store)
       end
     end
   end
+  -- The weapon pack: up to PACK_SIZE arsenal weapons a mission starts with, 0 for an empty slot.
+  -- With no saved pack, the newest weapons (highest ids) fill it.
+  local saved_pack, pack, used = store and store.get("pack"), {}, {}
+  for slot = 1, PACK_SIZE do
+    local id = type(saved_pack) == "table" and whole(saved_pack[slot])
+    if id and arsenal[id] and not used[id] then pack[slot], used[id] = id, true else pack[slot] = 0 end
+  end
+  if type(saved_pack) ~= "table" then
+    local slot = 1
+    for id = 99, 1, -1 do
+      if arsenal[id] and slot <= PACK_SIZE then pack[slot], slot = id, slot + 1 end
+    end
+  end
   local self = setmetatable({levels=levels, store=store, cleared=cleared, count=count, arsenal=arsenal,
-    records=records}, Overworld)
+    records=records, pack=pack}, Overworld)
   self:count_stars()
   return self
+end
+
+Overworld.PACK_SIZE = PACK_SIZE
+
+function Overworld:save_pack()
+  if self.store then pcall(self.store.set, "pack", self.pack) end
+end
+
+-- The pack as a set ({[id]=true}) for Game.new.
+function Overworld:pack_set()
+  local set = {}
+  for _, id in ipairs(self.pack) do
+    if id > 0 and self.arsenal[id] then set[id] = true end
+  end
+  return set
+end
+
+-- True when the arsenal holds any weapon, so the briefing shows the pack.
+function Overworld:has_arsenal()
+  return next(self.arsenal) ~= nil
+end
+
+-- Steps a pack slot to the next (step 1) or previous (step -1) arsenal weapon that no other slot holds.
+-- Empty (0) sits between the last and the first weapon.
+function Overworld:cycle_pack(slot, step)
+  local options, taken = {0}, {}
+  for other, id in ipairs(self.pack) do
+    if other ~= slot then taken[id] = true end
+  end
+  for id = 1, 99 do
+    if self.arsenal[id] and not taken[id] then options[#options+1] = id end
+  end
+  local at = 1
+  for index, id in ipairs(options) do
+    if id == self.pack[slot] then at = index end
+  end
+  local id = options[(at - 1 + step) % #options + 1]
+  if id == self.pack[slot] then return false end
+  self.pack[slot] = id
+  self:save_pack()
+  return true
 end
 
 -- Earned stars for a mission as bits. A clear saved before stars existed still counts as one.
@@ -114,6 +170,20 @@ function Overworld:keep_weapons(ids, first, last)
     for id in pairs(self.arsenal) do list[#list+1] = id end
     table.sort(list)
     pcall(self.store.set, "arsenal", list)
+  end
+  -- New weapons fill empty pack slots.
+  if added then
+    local packed, changed = {}, false
+    for _, id in ipairs(self.pack) do packed[id] = true end
+    for index = first, last do
+      local id = ids[index]
+      if id and id > 0 and not packed[id] then
+        for slot = 1, PACK_SIZE do
+          if self.pack[slot] == 0 then self.pack[slot], packed[id], changed = id, true, true; break end
+        end
+      end
+    end
+    if changed then self:save_pack() end
   end
   return added
 end

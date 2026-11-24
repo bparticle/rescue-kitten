@@ -831,6 +831,7 @@ await walk('right', 88);
 await walk('down', 168);
 assert.equal(status()[2], '2', 'walking over the assault rifle equips it');
 assert.deepEqual(JSON.parse(badge.storageJson()).arsenal, [2], 'the picked-up rifle is saved at once');
+assert.deepEqual(JSON.parse(badge.storageJson()).pack, [2, 0, 0], 'a new weapon fills an empty pack slot');
 {
   const [x0] = position();
   await badge.press('left', { after: 0 });
@@ -866,10 +867,10 @@ assert.equal(status()[9], 'missions', 'Outpost is locked');
 assert.equal(status()[19], '9');
 assert.deepEqual(badge.errors, []);
 
-// A veteran save: eight clears open Outpost, and the kept rifle joins its loadout.
+// A veteran save: eight clears open Outpost. Four kept weapons, and the pack takes three of them.
 const veteranClears = Object.fromEntries(['backyard', 'orchard', 'farmhouse', 'crate-yard', 'riverside',
   'hedge-maze', 'burning-barn', 'cold-storage'].map((id) => [id, true]));
-const veteran = new SolanaOS({ dir: app, storageJson: JSON.stringify({ mission_clears: veteranClears, arsenal: [2, 6] }) });
+const veteran = new SolanaOS({ dir: app, storageJson: JSON.stringify({ mission_clears: veteranClears, arsenal: [2, 6, 9, 13] }) });
 await veteran.launch();
 installHeadlessClock(veteran, 16);
 const veteranCall = veteran.call.bind(veteran);
@@ -888,20 +889,35 @@ assert.equal(veteranStatus()[9], 'missions', 'Fortress waits for Outpost');
 await veteran.press('left');
 await veteran.press('select');
 assert.equal(veteranStatus()[9], 'briefing');
+const vetPack = () => (JSON.parse(veteran.storageJson()).pack ?? []).join(',');
+assert.equal(vetPack(), '', 'the default pack is not saved until it changes');
 if (shots) veteran.screenshot(path.join(shots, 'outpost-briefing.png'));
+await veteran.press('down');
+await veteran.press('right');
+assert.equal(vetPack(), '13,0,6', 'the newest kept weapons fill a default pack; Right steps past the last to empty');
+await veteran.press('right');
+assert.equal(vetPack(), '13,2,6', 'then wraps to the first kept weapon no other slot holds');
+await veteran.press('left');
+await veteran.press('left');
+assert.equal(vetPack(), '13,9,6', 'Left steps back');
+await veteran.press('up');
+await veteran.press('up');
+await veteran.press('left');
+assert.equal(vetPack(), '13,9,2', 'Up wraps to the last slot');
+if (shots) veteran.screenshot(path.join(shots, 'outpost-pack.png'));
 await veteran.press('select');
 await veteran.frames(40);
 assert.deepEqual(veteranStatus().slice(0, 2).map(Number), [24, 264], 'mission 9 is Outpost');
 const cycled = [veteranStatus()[2]];
-for (let i = 0; i < 3; i++) { await veteran.press('back'); await veteran.frames(2); cycled.push(veteranStatus()[2]); }
-assert.deepEqual(cycled, ['1', '2', '6', '1'], 'Cancel cycles through the loadout and the kept weapons');
+for (let i = 0; i < 4; i++) { await veteran.press('back'); await veteran.frames(2); cycled.push(veteranStatus()[2]); }
+assert.deepEqual(cycled, ['1', '2', '9', '13', '1'], 'Cancel cycles through the loadout and the pack, not the whole arsenal');
 if (shots) veteran.screenshot(path.join(shots, 'level-start.png'));
 // Walk into the crossroads firefight and keep shooting.
 for (let i = 0; i < 12; i++) { await veteran.hold('right', 25); await veteran.press('select'); }
 for (let i = 0; i < 6; i++) { await veteran.hold('up', 15); await veteran.press('select'); }
 if (shots) veteran.screenshot(path.join(shots, 'level-fight.png'));
 if (process.env.DUST_RANGE_BUDGET !== 'off') assert.ok(peak < 160_000, `level callback budget regressed: ${peak}`);
-console.log(`ok  locked missions stay shut; kept weapons join Outpost's loadout; firefight within budget (${peak} / 200000 instructions)`);
+console.log(`ok  locked missions stay shut; the pack joins Outpost's loadout; firefight within budget (${peak} / 200000 instructions)`);
 assert.deepEqual(veteran.errors, []);
 
 // Reopen with the badge's saved progress and an additional exported mission.

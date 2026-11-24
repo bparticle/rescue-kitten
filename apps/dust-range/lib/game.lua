@@ -80,7 +80,7 @@ local function terrain(cells, columns, rows, seed)
   end
 end
 
--- arsenal: weapon IDs kept from earlier missions ({[id]=true}); missions start with them in hand.
+-- arsenal: the weapon pack, IDs kept from earlier missions ({[id]=true}); missions start with them in hand.
 -- checkpoint: a mission snapshot to resume from (lib/mission.lua), or nil.
 function Game.new(seed, drill, surveyed_ground, practice, arsenal, checkpoint)
   local x, y = 448, 320

@@ -22,6 +22,7 @@ if not has_index or type(levels) ~= "table" then levels = {} end
 local has_levels, level_choice = #levels > 0, 1
 local overworld = Overworld.new(levels, storage)
 local briefing_choice, active_mission, missions_back = 1, nil, "start"
+local pack_slot = 1
 local kept_found = 0
 screen:loading()
 if indicators then indicators:clear() end
@@ -42,7 +43,7 @@ end
 
 local function start_game(kind, id, checkpoint)
   game = Game.new(SEED, kind, not range.survey and range.ground or nil, id,
-    kind == "level" and overworld.arsenal or nil, checkpoint)
+    kind == "level" and overworld:pack_set() or nil, checkpoint)
   kept_found = game.found
   if game.survey then screen:loading() end
   resume_game()
@@ -95,6 +96,14 @@ local function navigate(key, repeated)
     if key == "select" and not repeated then
       active_mission = briefing_choice
       start_game("level", levels[active_mission].id)
+    elseif briefing_choice > 1 and overworld:has_arsenal() then
+      -- Up/Down picks a pack slot, Left/Right swaps the weapon in it.
+      if (key == "up" or key == "down") and not repeated then
+        pack_slot = (pack_slot - 1 + (key == "up" and -1 or 1)) % Overworld.PACK_SIZE + 1
+        menu_dirty = true
+      elseif key == "left" or key == "right" then
+        if overworld:cycle_pack(pack_slot, key == "left" and -1 or 1) then menu_dirty = true end
+      end
     end
   elseif scene == "missions" then
     if key == "left" or key == "right" then
@@ -207,7 +216,8 @@ function on_tick(ms)
       if scene == "briefing" then
         local level = levels[briefing_choice]
         unfinished = menu:draw_briefing(level, briefing_choice, menu_dirty == "rest",
-          overworld.records[level.id], overworld:stars(briefing_choice))
+          overworld.records[level.id], overworld:stars(briefing_choice),
+          overworld:has_arsenal() and overworld.pack or nil, pack_slot)
         if indicators then indicators:clear() end
       elseif scene == "missions" then
         overworld:draw(menu.canvas, level_choice)

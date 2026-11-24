@@ -303,8 +303,28 @@ local function star_goals(c, level, stars, y)
   end
 end
 
+-- The weapon pack beside the briefing: one row per slot, the chosen slot outlined, its weapon named below.
+local function draw_pack(c, pack, slot)
+  c:rect(201,97,92,75,0x444738)
+  text(c,"PACK",206,101,DIM)
+  right(c,slot .. "/" .. #pack,288,101,DIM)
+  for row, id in ipairs(pack) do
+    local y = 111 + (row-1)*17
+    local chosen = row == slot
+    c:rect(205,y,84,15,chosen and BRASS or 0x5a5c48)
+    c:rect(206,y+1,82,13,chosen and 0x5d5a45 or 0x3a3c30)
+    local art = icons[id]
+    if art then stamp(c,art[3],247-art[1]//2,y+7-art[2]//2,1)
+    else text(c,"EMPTY",233,y+4,0x7b745e) end
+  end
+  local weapon = Range.weapons[pack[slot]]
+  local name = weapon and weapon.name:upper() or "NO WEAPON"
+  text(c,name,247-(6*#name-1)//2,163,weapon and TEXT or DIM)
+end
+
 -- record: the saved best for this mission ({s=score, t=seconds}) or nil. stars: earned star bits.
-function Menu:draw_briefing(level, index, rest, record, stars)
+-- pack: the weapon pack (slot ids, 0 for empty) when the player has kept weapons; slot: the chosen slot.
+function Menu:draw_briefing(level, index, rest, record, stars, pack, slot)
   stars = stars or 0
   local c = self.canvas
   local goal = objectives[level.objective] or objectives.clear
@@ -326,7 +346,7 @@ function Menu:draw_briefing(level, index, rest, record, stars)
     text(c,goal[3],181,188,TEXT)
     return true
   end
-  frame(c,"SELECT START", "CANCEL MAP")
+  frame(c,pack and "SELECT START  U/D L/R PACK" or "SELECT START", "CANCEL MAP")
 
   if record then text(c,"BEST " .. record.s .. "  " .. record.t .. "S",18,18,BRASS)
   else text(c,"DUSTPAW",18,18,DIM) end
@@ -342,12 +362,14 @@ function Menu:draw_briefing(level, index, rest, record, stars)
   text(c,goal[2],32,114,TEXT)
   if goal[3] then text(c,goal[3],32,126,TEXT) end
   if level.brief then
-    for line_index, line in ipairs(wrap(level.brief, rescue and 27 or 44)) do
+    for line_index, line in ipairs(wrap(level.brief, (rescue or pack) and 27 or 44)) do
       if line_index > 2 then break end
       text(c,line,32,136+line_index*12,BRASS)
     end
   end
-  if rescue then
+  if pack then
+    draw_pack(c,pack,slot)
+  elseif rescue then
     local kitten = require("art.kitten")
     c:rect(201,97,92,75,0x444738)
     for x = 205, 289, 12 do c:rect(x,101,1,67,0x4f5342) end

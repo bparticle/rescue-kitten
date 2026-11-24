@@ -18,7 +18,7 @@ function Mission.start(game, id, checkpoint)
   end
   game.owned = {}
   for _, id in ipairs(def.loadout or {}) do game.owned[id] = true end
-  -- Weapons kept from earlier missions join the loadout. Cancel cycles through all of them.
+  -- The weapon pack (up to three weapons kept from earlier missions) joins the loadout.
   for id in pairs(game.arsenal or {}) do
     if game.weapons[id] then game.owned[id] = true end
   end
