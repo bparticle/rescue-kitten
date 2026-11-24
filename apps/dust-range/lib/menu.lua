@@ -304,7 +304,10 @@ local function star_goals(c, level, stars, y)
 end
 
 -- The weapon pack beside the briefing: one row per slot, the chosen slot outlined, its weapon named below.
-local function draw_pack(c, pack, slot)
+-- A weapon the mission already hands out is dimmed and tagged KIT: that slot adds nothing here.
+local function draw_pack(c, pack, slot, loadout)
+  local kit = {}
+  for _, id in ipairs(loadout or {}) do kit[id] = true end
   c:rect(201,97,92,75,0x444738)
   text(c,"PACK",206,101,DIM)
   right(c,slot .. "/" .. #pack,288,101,DIM)
@@ -314,12 +317,17 @@ local function draw_pack(c, pack, slot)
     c:rect(205,y,84,15,chosen and BRASS or 0x5a5c48)
     c:rect(206,y+1,82,13,chosen and 0x5d5a45 or 0x3a3c30)
     local art = icons[id]
-    if art then stamp(c,art[3],247-art[1]//2,y+7-art[2]//2,1)
+    if art and kit[id] then
+      c:rect(206,y+1,82,13,chosen and 0x4a483a or 0x313329)
+      stamp(c,art[3],228-art[1]//2,y+7-art[2]//2,1)
+      text(c,"KIT",265,y+4,0x7b745e)
+    elseif art then stamp(c,art[3],247-art[1]//2,y+7-art[2]//2,1)
     else text(c,"EMPTY",233,y+4,0x7b745e) end
   end
-  local weapon = Range.weapons[pack[slot]]
-  local name = weapon and weapon.name:upper() or "NO WEAPON"
-  text(c,name,247-(6*#name-1)//2,163,weapon and TEXT or DIM)
+  local id = pack[slot]
+  local weapon = Range.weapons[id]
+  local name = weapon and (kit[id] and "IN LOADOUT" or weapon.name:upper()) or "NO WEAPON"
+  text(c,name,247-(6*#name-1)//2,163,weapon and not kit[id] and TEXT or DIM)
 end
 
 -- record: the saved best for this mission ({s=score, t=seconds}) or nil. stars: earned star bits.
@@ -368,7 +376,7 @@ function Menu:draw_briefing(level, index, rest, record, stars, pack, slot)
     end
   end
   if pack then
-    draw_pack(c,pack,slot)
+    draw_pack(c,pack,slot,level.loadout)
   elseif rescue then
     local kitten = require("art.kitten")
     c:rect(201,97,92,75,0x444738)

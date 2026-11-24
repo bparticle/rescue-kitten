@@ -1,8 +1,8 @@
 {
   "id": "dust-range",
   "name": "Dustpaw",
-  "version": "0.24.0",
-  "summary": "Rescue a kitten, play more missions, and practice in the testing range.",
+  "version": "0.25.0",
+  "summary": "Rescue the kitten across ten missions, earn stars and pick your weapon pack.",
   "icon": "gps",
   "accent": "D7BC78",
   "category": "games",

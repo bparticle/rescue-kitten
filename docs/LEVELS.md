@@ -118,4 +118,4 @@ Every tile's behaviour comes from `sprites/tiles/materials.json`. The game, the 
 
 ## Export format
 
-`apps/dust-range/levels/<id>.lua` returns the level size, objective, health, optional par time, loadout and entities. It also has one string per layer, with one or two characters per cell. Each character indexes that layer's legend of `material/variant` keys, or `T<n>` for range terrain tiles. An `@` suffix can add supporting artwork such as a surface underneath, lane markings or a roof detail. The first line holds JSON metadata that the builder uses to rebuild `index.lua`.
+`apps/dust-range/levels/<id>.lua` returns the level size, objective, health, optional par time, loadout and entities. It also has one string per layer, with one or two characters per cell. Each character indexes that layer's legend of `material/variant` keys, or `T<n>` for range terrain tiles. An `@` suffix can add supporting artwork such as a surface underneath, lane markings or a roof detail. The first line holds JSON metadata that the builder uses to rebuild `index.lua`. The index carries each level's loadout so the briefing can mark pack weapons the mission already hands out.
