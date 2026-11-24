@@ -82,7 +82,8 @@ end
 
 -- arsenal: the weapon pack, IDs kept from earlier missions ({[id]=true}); missions start with them in hand.
 -- checkpoint: a mission snapshot to resume from (lib/mission.lua), or nil.
-function Game.new(seed, drill, surveyed_ground, practice, arsenal, checkpoint)
+-- kept: every weapon kept so far ({[id]=true}). Their level pickups stay away, so only the pack brings them.
+function Game.new(seed, drill, surveyed_ground, practice, arsenal, checkpoint, kept)
   local x, y = 448, 320
   local ground = surveyed_ground or {}
   local game = setmetatable({
@@ -97,7 +98,7 @@ function Game.new(seed, drill, surveyed_ground, practice, arsenal, checkpoint)
   }, Game)
   if drill == "level" then
     Level, Mission = require("lib.level"), require("lib.mission")
-    game.enemy_targets, game.level_id, game.arsenal = {game}, practice, arsenal
+    game.enemy_targets, game.level_id, game.arsenal, game.kept = {game}, practice, arsenal, kept
     game.popups, game.streak, game.freeze = {}, 0, 0
     game.survey = coroutine.create(function() Mission.start(game, practice, checkpoint) end)
     return game
@@ -531,7 +532,9 @@ function Game:fire(weapon, level)
   local x, y, dx, dy = self:muzzle(weapon)
   local z, dz
   if self.level and self.rooftop_enemies and not lobbed[kind] then
-    z, dz = self:aim_elevation(x, y, dx, dy, weapon.speed*weapon.life, kind == "rail" and "rail" or "shot")
+    local aim_x, aim_y
+    z, dz, aim_x, aim_y = self:aim_elevation(x, y, dx, dy, weapon.speed*weapon.life, kind == "rail" and "rail" or "shot")
+    if aim_x then dx, dy = aim_x, aim_y end
   end
   self:muzzle_flash(self, kind, x, y, dx, dy)
   if kind == "rail" then return self:rail(weapon, x, y, dx, dy, z, dz) end
@@ -572,26 +575,30 @@ function Game:ray(x, y, dx, dy, reach, z, dz)
   return hits
 end
 
--- Directional aiming still chooses a lane in screen space. A clear ground
--- target takes precedence over a rooftop target farther down that lane.
+-- Rooftop enemies aim straight at the player, so the player's shots get the same courtesy:
+-- a clear rooftop target inside the facing's 45-degree sector draws the shot onto it.
+-- A clear ground target in the lane takes precedence over a rooftop target farther away.
+-- Returns the shot height, its slope and the new direction, or nil to fire flat down the lane.
+local ROOF_SECTOR = 0.42 -- tan(22.5 degrees), half of one of the eight facings
 function Game:aim_elevation(x, y, dx, dy, reach, kind)
   local stop = self:cover_entry(x,y,dx,dy,reach,0,kind) or reach
   local ground = self:ray(x,y,dx,dy,stop)[1]
   local best = ground and ground.along or reach
-  local slope
+  local slope, aim_x, aim_y
   for _, target in ipairs(self.enemies) do
     if target.roof and target.health > 0 then
       local tx, ty = target.x-x, target.y-y
       local along, across = tx*dx+ty*dy, tx*dy-ty*dx
-      if along > 0 and along <= best and abs(across) <= target.surface.radius then
-        local dz = Level.ROOF_HEIGHT/along
-        if not self:cover_entry(x,y,dx,dy,along,0,kind,nil,Level.AIM_HEIGHT,dz) then
-          best, slope = along, dz
+      local distance = sqrt(tx*tx + ty*ty)
+      if along > 0 and distance <= best and abs(across) <= along*ROOF_SECTOR + target.surface.radius then
+        local ux, uy, dz = tx/distance, ty/distance, Level.ROOF_HEIGHT/distance
+        if not self:cover_entry(x,y,ux,uy,distance,0,kind,nil,Level.AIM_HEIGHT,dz) then
+          best, slope, aim_x, aim_y = distance, dz, ux, uy
         end
       end
     end
   end
-  if slope then return Level.AIM_HEIGHT, slope end
+  if slope then return Level.AIM_HEIGHT, slope, aim_x, aim_y end
 end
 
 function Game:mark(target, x, y)

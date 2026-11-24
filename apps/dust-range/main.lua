@@ -43,7 +43,7 @@ end
 
 local function start_game(kind, id, checkpoint)
   game = Game.new(SEED, kind, not range.survey and range.ground or nil, id,
-    kind == "level" and overworld:pack_set() or nil, checkpoint)
+    kind == "level" and overworld:pack_set() or nil, checkpoint, kind == "level" and overworld.arsenal or nil)
   kept_found = game.found
   if game.survey then screen:loading() end
   resume_game()

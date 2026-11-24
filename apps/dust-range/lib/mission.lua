@@ -43,7 +43,10 @@ function Mission.start(game, id, checkpoint)
         total = math.max(total, wave)
       end
     elseif kind == "pickup" then
-      game.pickups[#game.pickups+1] = {id=entity[2], x=entity[3], y=entity[4]}
+      -- A weapon kept from an earlier run doesn't lie around again: bring it in the pack instead.
+      -- Its pickup stays in the list (collected) so checkpoint indexes don't shift.
+      game.pickups[#game.pickups+1] = {id=entity[2], x=entity[3], y=entity[4],
+        collected=game.kept and game.kept[entity[2]] or nil}
     elseif kind == "medkit" then
       game:add_medkit(entity[2], entity[3])
     elseif kind == "hamburger" then

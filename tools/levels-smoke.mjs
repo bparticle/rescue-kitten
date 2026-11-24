@@ -239,6 +239,27 @@ check('the player can return fire at the rooftop guard, but cannot fire through 
   g:request_fire(); run(g, 200)
   assert(roof.health == hp)
   return "ok"`, 'ok');
+check('rooftop shots lock onto a guard inside the facing sector, like the guard aims at the player', `local g = fresh("roof-check")
+  local roof, indoor = g.enemies[1], g.enemies[2]
+  indoor.health = 0
+  local hp = roof.health
+  g.x = 94
+  g:request_fire(); run(g, 200)
+  assert(roof.health < hp, "off-lane rooftop guard inside the sector is hit")
+  hp = roof.health
+  g.x = 140
+  g:request_fire(); run(g, 200)
+  assert(roof.health == hp, "a guard outside the sector is not")
+  return "ok"`, 'ok');
+check('kept weapons are not lying around in a mission; the pack brings them', `local g = Game.new(427, "level", nil, "outpost", {[4]=true}, nil, {[3]=true, [4]=true})
+  while g.survey do g:prepare() end
+  local shown = {}
+  for _, item in ipairs(g.pickups) do
+    if item.id and g:pickup_visible(item) then shown[#shown+1] = item.id end
+  end
+  table.sort(shown)
+  assert(g.owned[4] and not g.owned[3])
+  return table.concat(shown, ",")`, '5,8');
 check('a muzzle pressed against a narrow wall cannot fire through it', `local g = fresh("roof-check")
   local i = cell(g,4,5)
   local hp = g.level.hp[i]
