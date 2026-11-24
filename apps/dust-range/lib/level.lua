@@ -58,7 +58,16 @@ local function record(level, key)
     local def = assert(tiles.materials[id], "Unknown tile " .. key)
     variant = tonumber(variant) or 1
     local opaque = tiles.opaque[id]
-    entry = {id=id, variant=variant, def=def, art=tiles.art[id] and tiles.art[id][variant],
+    local set = tiles.pieces[id]
+    -- A tile set that reuses 8x8 quarters stores each tile as four of them, already in place.
+    local art
+    if set then
+      local dict, map = set.dict, set.map[variant]
+      art = dict[byte(map,1)-34] .. dict[byte(map,2)-34] .. dict[byte(map,3)-34] .. dict[byte(map,4)-34]
+    else
+      art = tiles.art[id] and tiles.art[id][variant]
+    end
+    entry = {id=id, variant=variant, def=def, art=art,
       opaque=opaque and opaque:sub(variant,variant) == "1", boxes=footprint(def, variant)}
     if def.terrain then entry.terrain = 1 end
     if base and base ~= "" then entry.base = record(level, base) end

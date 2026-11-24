@@ -80,6 +80,108 @@ def write_module(name, lines):
     (OUT / f'{name}.lua').write_text(text, encoding='ascii', newline='\n')
 
 
+def visible(image):
+    """What an image shows: one colour per opaque pixel, None where it is transparent."""
+    return [pixel[:3] if pixel[3] else None for pixel in image.get_flattened_data()]
+
+
+def paint(canvas, packed, palette, left=0, top=0):
+    """Draw a packed string onto an RGBA image, as the game's stamp does."""
+    colors, data = list(palette), packed[3:-3]
+    for i in range(0, len(data), 5):
+        x, y, width, height, index = (ord(char) - SYMBOL_START for char in data[i:i + 5])
+        canvas.paste(colors[index - 1] + (255,), (left + x, top + y, left + x + width, top + y + height))
+
+
+# Hero frames that several weapons share are packed once. Weapons in one family are drawn in the
+# same pose, so they share 70-93% of their pixels in every frame. A weapon that is listed nowhere
+# (the rocket launcher) keeps only the layer shared by all of them.
+HERO_FAMILIES = {
+    'one': ['unarmed', 'handgun', 'grenade', 'tnt', 'bankshot', 'boomerang-disc', 'gravity-orb'],
+    'two': ['assault-rifle', 'pump-shotgun', 'rail-rifle', 'arc-projector', 'charge-cannon',
+            'shock-hammer', 'cryo-sprayer', 'flamethrower'],
+}
+
+
+# The hero's body colours. Enemy skins recolour exactly these four, so palette.lua says where they sit.
+SKIN_BASE = {'light': (0x68, 0x85, 0x8a), 'shade': (0x38, 0x55, 0x5a), 'dark': (0x2a, 0x40, 0x43),
+             'hood': (0x4d, 0x6d, 0x72)}
+
+
+def hero_layers(sheets, palette):
+    """Split each hero frame into pixels every weapon shares, pixels its family shares and its own.
+    The layers never overlap, so drawing all three in any order rebuilds the frame exactly.
+    sheets[weapon][direction][pose] is an image. Returns (shared, families, rest), each indexed
+    [direction][pose] with a packed string; families by name and rest by weapon."""
+    names = list(sheets)
+    family_of = {name: family for family, members in HERO_FAMILIES.items() for name in members}
+    assert set(family_of) <= set(names), 'a hero family lists an unknown weapon'
+    rows, poses = len(sheets[names[0]]), len(sheets[names[0]][0])
+    shared = [[None] * poses for _ in range(rows)]
+    families = {family: [[None] * poses for _ in range(rows)] for family in HERO_FAMILIES}
+    rest = {name: [[None] * poses for _ in range(rows)] for name in names}
+    for row in range(rows):
+        for pose in range(poses):
+            size = sheets[names[0]][row][pose].size
+            pixels = {name: sheets[name][row][pose].load() for name in names}
+            blank = lambda: Image.new('RGBA', size, (0, 0, 0, 0))
+            layer_all = blank()
+            layer_family = {family: blank() for family in HERO_FAMILIES}
+            layer_rest = {name: blank() for name in names}
+            for y in range(size[1]):
+                for x in range(size[0]):
+                    color = {name: pixels[name][x, y][:3] if pixels[name][x, y][3] else None for name in names}
+                    first = color[names[0]]
+                    if first and all(value == first for value in color.values()):
+                        layer_all.putpixel((x, y), first + (255,))
+                        continue
+                    agreed = set()
+                    for family, members in HERO_FAMILIES.items():
+                        value = color[members[0]]
+                        if value and all(color[member] == value for member in members):
+                            layer_family[family].putpixel((x, y), value + (255,))
+                            agreed.add(family)
+                    for name in names:
+                        if color[name] and family_of.get(name) not in agreed:
+                            layer_rest[name].putpixel((x, y), color[name] + (255,))
+            shared[row][pose] = pack(layer_all, palette)
+            for family in HERO_FAMILIES:
+                families[family][row][pose] = pack(layer_family[family], palette)
+            for name in names:
+                rest[name][row][pose] = pack(layer_rest[name], palette)
+                family = family_of.get(name)
+                canvas = blank()
+                for packed in (shared[row][pose], families[family][row][pose] if family else '[=[]=]',
+                               rest[name][row][pose]):
+                    paint(canvas, packed, palette)
+                assert visible(canvas) == visible(sheets[name][row][pose]), \
+                    f'{name} frame {row}/{pose} does not rebuild from its layers'
+    return shared, families, rest
+
+
+def hero_module(shared, families):
+    """The module every weapon file calls: it joins the shared layers with the weapon's own."""
+    def layer(rows):
+        return ['    {' + ','.join(row) + '},' for row in rows]
+    lines = ['-- Hero frames split into layers that never overlap. "all" is drawn for every weapon, a family',
+             '-- layer for the weapons in that pose family, and each art/<weapon>.lua adds what is left.',
+             'local layers = {', '  all = {', *layer(shared), '  },']
+    for family, rows in families.items():
+        lines += [f'  {family} = {{', *layer(rows), '  },']
+    lines += ['}', '',
+              '-- Joins the layers into art[direction][pose], one packed string per frame (pose 1 is idle).',
+              'return function(family, rest)',
+              '  local all, middle, art = layers.all, layers[family], {}',
+              '  for direction = 1, #all do',
+              '    local row, base, mid, own = {}, all[direction], middle and middle[direction], rest[direction]',
+              '    for pose = 1, #base do row[pose] = base[pose] .. (mid and mid[pose] or "") .. own[pose] end',
+              '    art[direction] = row',
+              '  end',
+              '  return art',
+              'end']
+    write_module('hero-layers', lines)
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     palette = {}
@@ -94,14 +196,17 @@ def main():
     columns = layout['framesPerDirection']
     idle = cells(read_png(hero_dir / layout['idleSheet']['image']), width, height, len(names), directions)
     idle_order = layout['idleSheet']['columnsLeftToRight']
+    sheets = {}
     for name in names:
-        sheet = read_png(hero_dir / layout['sheets'][name])
-        walk = cells(sheet, width, height, columns, directions)
-        lines = ['return {']
-        for row, poses in enumerate(walk):
-            images = [idle[row][idle_order.index(name)], *poses]
-            lines.append('  {' + ','.join(pack(image, palette) for image in images) + '},')
-        lines.append('}')
+        walk = cells(read_png(hero_dir / layout['sheets'][name]), width, height, columns, directions)
+        sheets[name] = [[idle[row][idle_order.index(name)], *poses] for row, poses in enumerate(walk)]
+    shared, families, rest = hero_layers(sheets, palette)
+    hero_module(shared, families)
+    for name in names:
+        family = next((family for family, members in HERO_FAMILIES.items() if name in members), None)
+        lines = [f'return require("art.hero-layers")({json.dumps(family) if family else "nil"}, {{']
+        lines += ['  {' + ','.join(row) + '},' for row in rest[name]]
+        lines.append('})')
         write_module(name, lines)
 
     icons = ['return {']
@@ -144,7 +249,10 @@ def main():
     write_module('terrain', [*lines, '}'])
     assert len(palette) + SYMBOL_START < 127, f'{len(palette)} colours overflow the packed index'
     colors = ','.join('0x%02x%02x%02x' % color for color in palette)
-    write_module('palette', ['return {', f'  ground = 0x%02x%02x%02x,' % ground[:3], f'  colors = {{{colors}}},', '}'])
+    assert all(color in palette for color in SKIN_BASE.values()), 'the hero sprites no longer use a skin colour'
+    skin = ','.join(f'{name}={list(palette).index(color) + 1}' for name, color in SKIN_BASE.items())
+    write_module('palette', ['return {', f'  ground = 0x%02x%02x%02x,' % ground[:3], f'  colors = {{{colors}}},',
+                             f'  skin = {{{skin}}},', '}'])
     kitten = read_png(SPRITES / 'entities' / 'kitten.png')
     kitten_palette = {}
     art = pack(kitten, kitten_palette)
@@ -204,6 +312,50 @@ LEVEL_FIELDS = ('walk', 'shots', 'lobs', 'sight', 'pierce', 'hp', 'breaksTo', 'e
                 'height', 'underlay', 'variants')
 
 
+QUARTER_CORNERS = [(0, 0), (8, 0), (0, 8), (8, 8)]
+
+
+def place(packed, left, top):
+    """Move a packed string right and down, so a quarter can be stamped at its corner of a tile."""
+    data = packed[3:-3]
+    moved = ''.join(chr(ord(data[i]) + left) + chr(ord(data[i + 1]) + top) + data[i + 2:i + 5]
+                    for i in range(0, len(data), 5))
+    assert ']=]' not in moved and all(35 <= ord(char) < 127 for char in moved)
+    return '[=[' + moved + ']=]'
+
+
+def quarter_set(images, palette):
+    """Autotile variants are built from a few 8x8 quarters. Returns the distinct quarters, packed and
+    already placed at their corner of the tile, and a four-character map per variant. Returns None
+    when a set has too many distinct quarters to index. Each map is checked to rebuild its tile exactly."""
+    distinct, dictionary, maps = {}, [], []
+    for image in images:
+        codes = []
+        for corner, (left, top) in enumerate(QUARTER_CORNERS):
+            quarter = image.crop((left, top, left + 8, top + 8))
+            key = corner, tuple(visible(quarter))
+            if key not in distinct:
+                distinct[key] = len(dictionary)
+                dictionary.append(place(pack(quarter, palette, fill=True), left, top))
+            codes.append(distinct[key])
+        if max(codes) + SYMBOL_START >= 127:
+            return None
+        maps.append('[=[' + ''.join(chr(code + SYMBOL_START) for code in codes) + ']=]')
+        assert ']=]' not in maps[-1][3:-3]
+        canvas = Image.new('RGBA', image.size, (0, 0, 0, 0))
+        for code in codes:
+            paint(canvas, dictionary[code], palette)
+        assert visible(canvas) == visible(image), 'a tile does not rebuild from its quarters'
+    return dictionary, maps
+
+
+def quarters_fit(quarters, packed):
+    """Quarters win when they are well under the whole tiles: a tile drawn from four stamps costs a
+    little more to draw, so a marginal saving is not worth it."""
+    dictionary, maps = quarters
+    return sum(len(s) + 1 for s in dictionary) + sum(len(m) + 1 for m in maps) <= 0.8 * sum(len(s) + 1 for s in packed)
+
+
 def level_tiles():
     """Pack the level tileset and its gameplay properties. Tiles keep their own palette."""
     tiles = SPRITES / 'tiles'
@@ -214,9 +366,12 @@ def level_tiles():
     palette = {}
     lines = ['-- Level tiles. Properties come from sprites/tiles/materials.json.',
              '-- art[id][variant] is packed like the other sprites, with indexes into colors.',
+             '-- pieces[id] replaces art[id] for tile sets that reuse 8x8 quarters: dict holds each distinct quarter',
+             '-- already placed in its corner of the 16x16 tile, and map[variant] has four characters (top left,',
+             '-- top right, bottom left, bottom right), each the dict index plus 34. Join the four strings.',
              '-- opaque[id] has one character per variant: 1 = no transparent pixels.',
              'return {', '  materials = {']
-    art, opaque = [], []
+    art, opaque, pieces = [], [], []
     for material in spec['materials']:
         mid = material['id']
         fields = {k: material[k] for k in LEVEL_FIELDS if k in material}
@@ -224,20 +379,28 @@ def level_tiles():
         entry = layout['materials'].get(mid)
         if not entry:
             continue
-        packed, flags = [], ''
+        images, packed, flags = [], [], ''
         for index in range(entry['variants']):
             row = entry['row'] + index // columns
             col = index % columns
             image = sheet.crop((col * size, row * size, (col + 1) * size, (row + 1) * size))
             alpha = set(image.getchannel('A').get_flattened_data())
             assert alpha <= {0, 255}, f'{mid} has semi-transparent pixels'
+            images.append(image)
             packed.append(pack(image, palette, fill=True))
             flags += '1' if alpha == {255} else '0'
-        art.append(f'    [{json.dumps(mid)}] = {{{",".join(packed)}}},')
         opaque.append(f'    [{json.dumps(mid)}] = "{flags}",')
+        quarters = quarter_set(images, palette)
+        if quarters and quarters_fit(quarters, packed):
+            dictionary, maps = quarters
+            pieces.append(f'    [{json.dumps(mid)}] = {{dict={{{",".join(dictionary)}}},'
+                          f'map={{{",".join(maps)}}}}},')
+        else:
+            art.append(f'    [{json.dumps(mid)}] = {{{",".join(packed)}}},')
     assert len(palette) + SYMBOL_START < 127, f'{len(palette)} tile colours overflow the packed index'
     colors = ','.join('0x%02x%02x%02x' % color[:3] for color in palette)
-    lines += ['  },', f'  colors = {{{colors}}},', '  art = {', *art, '  },', '  opaque = {', *opaque, '  },', '}']
+    lines += ['  },', f'  colors = {{{colors}}},', '  art = {', *art, '  },',
+              '  pieces = {', *pieces, '  },', '  opaque = {', *opaque, '  },', '}']
     write_module('tiles', lines)
 
 

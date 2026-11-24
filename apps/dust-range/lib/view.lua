@@ -19,7 +19,8 @@ local BURGER_GOLD = 0xffc16a
 local STAR_NEW, STAR_EMPTY = 0xfff1b8, 0x5c5442
 local pickup_colors = {medkit=HP_GREEN, hamburger=BURGER_GOLD}
 local function skin(light, shade, dark, hood)
-  return setmetatable({[6]=light, [8]=shade, [9]=dark, [22]=hood}, {__index=palette.colors})
+  local at = palette.skin
+  return setmetatable({[at.light]=light, [at.shade]=shade, [at.dark]=dark, [at.hood]=hood}, {__index=palette.colors})
 end
 local skins = {
   soldier = skin(0xa45d5f, 0x663940, 0x422a33, 0x83474d),
